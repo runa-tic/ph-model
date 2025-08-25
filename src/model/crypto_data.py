@@ -95,7 +95,6 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
 
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
-
     supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
     exchanges = sorted({ex for ex, _ in supported_markets})
 
@@ -149,7 +148,6 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
             continue
-
     # Try common trading pairs on selected or all exchanges before using CoinGecko
     base_symbol = ticker.upper()
     generic_pairs = [
@@ -192,7 +190,6 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
             except Exception as exc:
                 logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
                 break
-
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
     coin_id = _get_coin_id(ticker)
