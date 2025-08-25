@@ -26,8 +26,11 @@ def _get_coin_id(ticker: str) -> str:
     list of options and let them choose the desired coin ID.
     """
 
-    resp = requests.get(f"{COINGECKO_API}/coins/list", timeout=30)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(f"{COINGECKO_API}/coins/list", timeout=30)
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        raise ValueError(f"CoinGecko coin list request failed: {exc}") from exc
     coins = [c for c in resp.json() if c["symbol"].lower() == ticker.lower()]
     if not coins:
         raise ValueError(f"Ticker {ticker} not found on CoinGecko")
@@ -53,8 +56,13 @@ def fetch_coin_info(ticker: str) -> Dict[str, float]:
     """Fetch current price (USD) and circulating supply for a ticker."""
     coin_id = _get_coin_id(ticker)
 
-    data_resp = requests.get(f"{COINGECKO_API}/coins/{coin_id}", timeout=30)
-    data_resp.raise_for_status()
+    try:
+        data_resp = requests.get(f"{COINGECKO_API}/coins/{coin_id}", timeout=30)
+        data_resp.raise_for_status()
+    except requests.HTTPError as exc:
+        raise ValueError(
+            f"CoinGecko coin info request failed for {coin_id}: {exc}"
+        ) from exc
     data = data_resp.json()
     price = data["market_data"]["current_price"]["usd"]
     supply = data["market_data"]["circulating_supply"]
@@ -64,8 +72,15 @@ def fetch_coin_info(ticker: str) -> Dict[str, float]:
 def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
     """Return list of (exchange id, trading pair) for active markets."""
     coin_id = _get_coin_id(ticker)
-    resp = requests.get(f"{COINGECKO_API}/coins/{coin_id}/tickers", timeout=30)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(
+            f"{COINGECKO_API}/coins/{coin_id}/tickers", timeout=30
+        )
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        raise ValueError(
+            f"CoinGecko markets request failed for {coin_id}: {exc}"
+        ) from exc
     data = resp.json()
     markets: List[Tuple[str, str]] = []
     for entry in data.get("tickers", []):
