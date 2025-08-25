@@ -22,8 +22,12 @@ def main() -> None:
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
-    info = fetch_coin_info(args.ticker)
-    ohlcv = fetch_ohlcv(args.ticker)
+    try:
+        info = fetch_coin_info(args.ticker)
+        ohlcv = fetch_ohlcv(args.ticker)
+    except ValueError as exc:
+        print(exc)
+        return
 
     filename = args.output or f"{args.ticker.upper()}_data.csv"
     save_to_csv(filename, info, ohlcv)

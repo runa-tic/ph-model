@@ -108,12 +108,18 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
     coin_id = _get_coin_id(ticker)
-    resp = requests.get(
-        f"{COINGECKO_API}/coins/{coin_id}/ohlc",
-        params={"vs_currency": "usd", "days": "max"},
-        timeout=30,
-    )
-    resp.raise_for_status()
+    try:
+        resp = requests.get(
+            f"{COINGECKO_API}/coins/{coin_id}/ohlc",
+            params={"vs_currency": "usd", "days": "max"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        raise ValueError(
+            f"CoinGecko OHLC request failed for {coin_id}: {exc}"
+        ) from exc
+
     data = resp.json()
     if not data:
         raise ValueError(f"No OHLCV data available for {ticker}")
