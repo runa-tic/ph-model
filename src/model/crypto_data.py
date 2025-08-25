@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import logging
 from datetime import datetime
 from typing import Dict, List, Tuple
 
@@ -11,6 +12,9 @@ import requests
 
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_coin_id(ticker: str) -> str:
@@ -54,14 +58,19 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
 def fetch_ohlcv(ticker: str) -> List[List[float]]:
     """Fetch OHLCV data from the first active market available via ccxt."""
     markets = _coin_markets(ticker)
+    logger.debug("Found %d markets for %s", len(markets), ticker)
     for exchange_name, symbol in markets:
         if exchange_name not in ccxt.exchanges:
+            logger.debug("Skipping unsupported exchange %s", exchange_name)
             continue
-        exchange_class = getattr(ccxt, exchange_name)()
+        exchange_class = getattr(ccxt, exchange_name)({"enableRateLimit": True})
         timeframe = "1d"
         since = 0
         all_data: List[List[float]] = []
+        logger.debug("Trying %s %s", exchange_name, symbol)
         try:
+            exchange_class.load_markets()
+
             while True:
                 batch = exchange_class.fetch_ohlcv(symbol, timeframe=timeframe, since=since, limit=1000)
                 if not batch:
@@ -69,11 +78,13 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
                 all_data.extend(batch)
                 since = batch[-1][0] + 24 * 60 * 60 * 1000
             if all_data:
+                logger.info("Fetched %d rows from %s %s", len(all_data), exchange_name, symbol)
                 return all_data
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
+
             continue
     raise ValueError(f"No OHLCV data available for {ticker}")
-
 
 
 def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]]) -> None:
