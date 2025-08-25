@@ -75,16 +75,39 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
     return markets
 
 
-def fetch_ohlcv(ticker: str) -> List[List[float]]:
-    """Fetch OHLCV data from the first active market available via ccxt."""
+def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
+    """Fetch OHLCV data from a specific exchange or fall back to CoinGecko."""
+
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
-    attempted: set[str] = set()
+    supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
+    exchanges = sorted({ex for ex, _ in supported_markets})
 
-    for exchange_name, symbol in markets:
-        if exchange_name not in ccxt.exchanges:
-            logger.debug("Skipping unsupported exchange %s", exchange_name)
-            continue
+    if exchange is None and exchanges:
+        if len(exchanges) > 1:
+            print(f"Available exchanges for {ticker}:")
+            for idx, ex in enumerate(exchanges, start=1):
+                print(f"{idx}. {ex}")
+            while True:
+                choice = input(f"Select exchange [1-{len(exchanges)}]: ")
+                try:
+                    idx = int(choice)
+                    if 1 <= idx <= len(exchanges):
+                        exchange = exchanges[idx - 1]
+                        break
+                except ValueError:
+                    pass
+                print("Invalid selection. Please try again.")
+        else:
+            exchange = exchanges[0]
+
+    if exchange and exchange not in ccxt.exchanges:
+        raise ValueError(f"Exchange {exchange} not supported by ccxt")
+
+    attempted: set[str] = set()
+    markets_to_try = [m for m in supported_markets if not exchange or m[0] == exchange]
+
+    for exchange_name, symbol in markets_to_try:
         attempted.add(exchange_name)
         exchange_class = getattr(ccxt, exchange_name)({"enableRateLimit": True})
         timeframe = "1d"
@@ -110,15 +133,16 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
             continue
-
-    # Try all ccxt exchanges with common trading pairs before using CoinGecko
+    # Try common trading pairs on selected or all exchanges before using CoinGecko
     base_symbol = ticker.upper()
     generic_pairs = [
         f"{base_symbol}/USDT",
         f"{base_symbol}/USD",
         f"{base_symbol}/BTC",
     ]
-    for exchange_name in ccxt.exchanges:
+
+    exchange_list = [exchange] if exchange else ccxt.exchanges
+    for exchange_name in exchange_list:
         if exchange_name in attempted:
             continue
         exchange_class = getattr(ccxt, exchange_name)({"enableRateLimit": True})
