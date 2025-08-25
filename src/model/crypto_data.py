@@ -151,11 +151,11 @@ def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]])
 def save_surge_snippets(
     filename: str, ohlcv: List[List[float]], multiplier: float = 2.0
 ) -> None:
-    """Save windows around days where price gained over ``multiplier`` times.
+    """Save windows around days where intraday high crosses ``multiplier``× open.
 
-    For each day where ``(high - open) / open`` is at least ``multiplier``,
-    write a five-day window (two days before and after the surge) to ``filename``.
-    The CSV includes an ``event_id`` to group rows and ``is_event_day`` flag.
+    For each day where ``high / open`` is at least ``multiplier``, write a five-day
+    window (two days before and after the surge) to ``filename``. The CSV includes
+    an ``event_id`` to group rows and ``is_event_day`` flag.
     """
 
     with open(filename, "w", newline="") as f:
@@ -165,7 +165,7 @@ def save_surge_snippets(
         )
         event_id = 1
         for i, (ts, open_, high, low, close, volume) in enumerate(ohlcv):
-            if open_ > 0 and (high - open_) / open_ >= multiplier:
+            if open_ > 0 and (high / open_) >= multiplier:
                 start = max(0, i - 2)
                 end = min(len(ohlcv), i + 3)
                 for j in range(start, end):
