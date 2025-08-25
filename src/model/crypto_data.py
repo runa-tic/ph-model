@@ -84,7 +84,22 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
 
             continue
-    raise ValueError(f"No OHLCV data available for {ticker}")
+
+    # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
+    logger.info("Falling back to CoinGecko OHLC for %s", ticker)
+    coin_id = _get_coin_id(ticker)
+    resp = requests.get(
+        f"{COINGECKO_API}/coins/{coin_id}/ohlc",
+        params={"vs_currency": "usd", "days": "max"},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if not data:
+        raise ValueError(f"No OHLCV data available for {ticker}")
+
+    # CoinGecko's OHLC endpoint does not provide volume; set it to 0.0
+    return [row + [0.0] for row in data]
 
 
 def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]]) -> None:
