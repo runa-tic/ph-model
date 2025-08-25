@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import logging
 from datetime import datetime
+from functools import lru_cache
 from typing import Dict, List, Tuple
 
 
@@ -17,16 +18,35 @@ COINGECKO_API = "https://api.coingecko.com/api/v3"
 logger = logging.getLogger(__name__)
 
 
+@lru_cache(maxsize=None)
 def _get_coin_id(ticker: str) -> str:
-    """Resolve CoinGecko coin ID for a ticker."""
+    """Resolve CoinGecko coin ID for a ticker.
+
+    If multiple coins share the same ticker symbol, present the user with a
+    list of options and let them choose the desired coin ID.
+    """
 
     resp = requests.get(f"{COINGECKO_API}/coins/list", timeout=30)
     resp.raise_for_status()
-    coins = resp.json()
-    coin_id = next((c["id"] for c in coins if c["symbol"].lower() == ticker.lower()), None)
-    if not coin_id:
+    coins = [c for c in resp.json() if c["symbol"].lower() == ticker.lower()]
+    if not coins:
         raise ValueError(f"Ticker {ticker} not found on CoinGecko")
-    return coin_id
+    if len(coins) == 1:
+        return coins[0]["id"]
+
+    print(f"Multiple coins found for ticker '{ticker}':")
+    for idx, coin in enumerate(coins, start=1):
+        print(f"{idx}. {coin['name']} ({coin['id']})")
+
+    while True:
+        choice = input(f"Select coin [1-{len(coins)}]: ")
+        try:
+            idx = int(choice)
+            if 1 <= idx <= len(coins):
+                return coins[idx - 1]["id"]
+        except ValueError:
+            pass
+        print("Invalid selection. Please try again.")
 
 
 def fetch_coin_info(ticker: str) -> Dict[str, float]:
@@ -84,7 +104,28 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
 
             continue
-    raise ValueError(f"No OHLCV data available for {ticker}")
+
+    # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
+    logger.info("Falling back to CoinGecko OHLC for %s", ticker)
+    coin_id = _get_coin_id(ticker)
+    try:
+        resp = requests.get(
+            f"{COINGECKO_API}/coins/{coin_id}/ohlc",
+            params={"vs_currency": "usd", "days": "max"},
+            timeout=30,
+        )
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        raise ValueError(
+            f"CoinGecko OHLC request failed for {coin_id}: {exc}"
+        ) from exc
+
+    data = resp.json()
+    if not data:
+        raise ValueError(f"No OHLCV data available for {ticker}")
+
+    # CoinGecko's OHLC endpoint does not provide volume; set it to 0.0
+    return [row + [0.0] for row in data]
 
 
 def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]]) -> None:
@@ -105,3 +146,41 @@ def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]])
                 close,
                 volume,
             ])
+
+
+def save_surge_snippets(
+    filename: str, ohlcv: List[List[float]], multiplier: float = 2.0
+) -> None:
+    """Save windows around days where intraday high crosses ``multiplier``× open.
+
+    For each day where ``high / open`` is at least ``multiplier``, write a five-day
+    window (two days before and after the surge) to ``filename``. The CSV includes
+    an ``event_id`` to group rows and ``is_event_day`` flag.
+    """
+
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            ["event_id", "date", "open", "high", "low", "close", "volume", "is_event_day"]
+        )
+        event_id = 1
+        for i, (ts, open_, high, low, close, volume) in enumerate(ohlcv):
+            if open_ > 0 and (high / open_) >= multiplier:
+                start = max(0, i - 2)
+                end = min(len(ohlcv), i + 3)
+                for j in range(start, end):
+                    ts2, o2, h2, l2, c2, v2 = ohlcv[j]
+                    writer.writerow(
+                        [
+                            event_id,
+                            datetime.utcfromtimestamp(ts2 / 1000).strftime("%d-%m-%Y"),
+                            o2,
+                            h2,
+                            l2,
+                            c2,
+                            v2,
+                            1 if j == i else 0,
+                        ]
+                    )
+                writer.writerow([])
+                event_id += 1
