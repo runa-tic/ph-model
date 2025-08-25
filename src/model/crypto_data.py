@@ -269,32 +269,13 @@ def save_surge_snippets(
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
-            [
-                "event_id",
-                "date",
-                "open",
-                "high",
-                "low",
-                "close",
-                "volume",
-                "is_event_day",
-                "ph_volume",
-            ]
+            ["event_id", "date", "open", "high", "low", "close", "volume", "is_event_day"]
         )
         event_id = 1
         for i, (ts, open_, high, low, close, volume) in enumerate(ohlcv):
             if open_ > 0 and (high / open_) >= multiplier:
                 start = max(0, i - 2)
                 end = min(len(ohlcv), i + 3)
-
-                surrounding = []
-                for offset in (-2, -1, 1, 2):
-                    j = i + offset
-                    if 0 <= j < len(ohlcv):
-                        surrounding.append(ohlcv[j][5])
-                avg_surrounding = sum(surrounding) / len(surrounding) if surrounding else 0.0
-                ph_volume = volume - avg_surrounding
-
                 for j in range(start, end):
                     ts2, o2, h2, l2, c2, v2 = ohlcv[j]
                     writer.writerow(
@@ -307,7 +288,6 @@ def save_surge_snippets(
                             c2,
                             v2,
                             1 if j == i else 0,
-                            ph_volume,
                         ]
                     )
                 writer.writerow([])
