@@ -79,10 +79,13 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
     """Fetch OHLCV data from the first active market available via ccxt."""
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
+    attempted: set[str] = set()
+
     for exchange_name, symbol in markets:
         if exchange_name not in ccxt.exchanges:
             logger.debug("Skipping unsupported exchange %s", exchange_name)
             continue
+        attempted.add(exchange_name)
         exchange_class = getattr(ccxt, exchange_name)({"enableRateLimit": True})
         timeframe = "1d"
         since = 0
@@ -92,19 +95,62 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
             exchange_class.load_markets()
 
             while True:
-                batch = exchange_class.fetch_ohlcv(symbol, timeframe=timeframe, since=since, limit=1000)
+                batch = exchange_class.fetch_ohlcv(
+                    symbol, timeframe=timeframe, since=since, limit=1000
+                )
                 if not batch:
                     break
                 all_data.extend(batch)
                 since = batch[-1][0] + 24 * 60 * 60 * 1000
             if all_data:
-                logger.info("Fetched %d rows from %s %s", len(all_data), exchange_name, symbol)
+                logger.info(
+                    "Fetched %d rows from %s %s", len(all_data), exchange_name, symbol
+                )
                 return all_data
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
-
             continue
 
+    # Try all ccxt exchanges with common trading pairs before using CoinGecko
+    base_symbol = ticker.upper()
+    generic_pairs = [
+        f"{base_symbol}/USDT",
+        f"{base_symbol}/USD",
+        f"{base_symbol}/BTC",
+    ]
+    for exchange_name in ccxt.exchanges:
+        if exchange_name in attempted:
+            continue
+        exchange_class = getattr(ccxt, exchange_name)({"enableRateLimit": True})
+        try:
+            exchange_class.load_markets()
+        except Exception as exc:
+            logger.debug("Skipping %s: %s", exchange_name, exc)
+            continue
+        for symbol in generic_pairs:
+            if symbol not in getattr(exchange_class, "symbols", []):
+                continue
+            timeframe = "1d"
+            since = 0
+            all_data: List[List[float]] = []
+            logger.debug("Trying %s %s", exchange_name, symbol)
+            try:
+                while True:
+                    batch = exchange_class.fetch_ohlcv(
+                        symbol, timeframe=timeframe, since=since, limit=1000
+                    )
+                    if not batch:
+                        break
+                    all_data.extend(batch)
+                    since = batch[-1][0] + 24 * 60 * 60 * 1000
+                if all_data:
+                    logger.info(
+                        "Fetched %d rows from %s %s", len(all_data), exchange_name, symbol
+                    )
+                    return all_data
+            except Exception as exc:
+                logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
+                break
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
     coin_id = _get_coin_id(ticker)
