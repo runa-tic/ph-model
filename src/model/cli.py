@@ -9,12 +9,13 @@ from .crypto_data import fetch_coin_info, fetch_ohlcv, save_to_csv
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch token info and OHLCV data")
     parser.add_argument("ticker", help="Token ticker symbol, e.g. btc")
-    parser.add_argument("--exchange", default="binance", help="Exchange name for OHLCV data")
+
     parser.add_argument("--output", default=None, help="Output CSV filename")
     args = parser.parse_args()
 
     info = fetch_coin_info(args.ticker)
-    ohlcv = fetch_ohlcv(args.ticker, args.exchange)
+    ohlcv = fetch_ohlcv(args.ticker)
+
     filename = args.output or f"{args.ticker.upper()}_data.csv"
     save_to_csv(filename, info, ohlcv)
     print(f"Data written to {filename}")

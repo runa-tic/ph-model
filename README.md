@@ -10,4 +10,6 @@ python -m model.cli btc
 ```
 
 The script saves a CSV file combining the current price, circulating supply and
-all available daily OHLCV data fetched from Binance.
+all available daily OHLCV data. The exchange is chosen automatically from the
+active markets listed on CoinGecko.
+
