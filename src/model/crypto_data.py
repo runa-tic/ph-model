@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import logging
 from datetime import datetime
+from functools import lru_cache
 from typing import Dict, List, Tuple
 
 
@@ -17,6 +18,7 @@ COINGECKO_API = "https://api.coingecko.com/api/v3"
 logger = logging.getLogger(__name__)
 
 
+@lru_cache(maxsize=None)
 def _get_coin_id(ticker: str) -> str:
     """Resolve CoinGecko coin ID for a ticker.
 
@@ -138,3 +140,41 @@ def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]])
                 close,
                 volume,
             ])
+
+
+def save_surge_snippets(
+    filename: str, ohlcv: List[List[float]], multiplier: float = 2.0
+) -> None:
+    """Save windows around days where price gained over ``multiplier`` times.
+
+    For each day where ``(high - open) / open`` is at least ``multiplier``,
+    write a five-day window (two days before and after the surge) to ``filename``.
+    The CSV includes an ``event_id`` to group rows and ``is_event_day`` flag.
+    """
+
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            ["event_id", "date", "open", "high", "low", "close", "volume", "is_event_day"]
+        )
+        event_id = 1
+        for i, (ts, open_, high, low, close, volume) in enumerate(ohlcv):
+            if open_ > 0 and (high - open_) / open_ >= multiplier:
+                start = max(0, i - 2)
+                end = min(len(ohlcv), i + 3)
+                for j in range(start, end):
+                    ts2, o2, h2, l2, c2, v2 = ohlcv[j]
+                    writer.writerow(
+                        [
+                            event_id,
+                            datetime.utcfromtimestamp(ts2 / 1000).strftime("%d-%m-%Y"),
+                            o2,
+                            h2,
+                            l2,
+                            c2,
+                            v2,
+                            1 if j == i else 0,
+                        ]
+                    )
+                writer.writerow([])
+                event_id += 1
