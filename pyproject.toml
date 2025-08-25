@@ -1,0 +1,13 @@
+[project]
+name = "ph-model"
+version = "0.1.0"
+description = "CLI tool to fetch cryptocurrency data using ccxt and CoinGecko"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "ccxt",
+    "requests",
+]
+
+[project.scripts]
+crypto-fetch = "model.cli:main"
