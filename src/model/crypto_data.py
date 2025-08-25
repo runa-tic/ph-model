@@ -18,15 +18,33 @@ logger = logging.getLogger(__name__)
 
 
 def _get_coin_id(ticker: str) -> str:
-    """Resolve CoinGecko coin ID for a ticker."""
+    """Resolve CoinGecko coin ID for a ticker.
+
+    If multiple coins share the same ticker symbol, present the user with a
+    list of options and let them choose the desired coin ID.
+    """
 
     resp = requests.get(f"{COINGECKO_API}/coins/list", timeout=30)
     resp.raise_for_status()
-    coins = resp.json()
-    coin_id = next((c["id"] for c in coins if c["symbol"].lower() == ticker.lower()), None)
-    if not coin_id:
+    coins = [c for c in resp.json() if c["symbol"].lower() == ticker.lower()]
+    if not coins:
         raise ValueError(f"Ticker {ticker} not found on CoinGecko")
-    return coin_id
+    if len(coins) == 1:
+        return coins[0]["id"]
+
+    print(f"Multiple coins found for ticker '{ticker}':")
+    for idx, coin in enumerate(coins, start=1):
+        print(f"{idx}. {coin['name']} ({coin['id']})")
+
+    while True:
+        choice = input(f"Select coin [1-{len(coins)}]: ")
+        try:
+            idx = int(choice)
+            if 1 <= idx <= len(coins):
+                return coins[idx - 1]["id"]
+        except ValueError:
+            pass
+        print("Invalid selection. Please try again.")
 
 
 def fetch_coin_info(ticker: str) -> Dict[str, float]:
