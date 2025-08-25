@@ -151,7 +151,6 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
             except Exception as exc:
                 logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
                 break
-
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
     coin_id = _get_coin_id(ticker)
