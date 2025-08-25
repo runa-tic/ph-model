@@ -5,6 +5,7 @@ import csv
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+
 import ccxt
 import requests
 
@@ -14,6 +15,7 @@ COINGECKO_API = "https://api.coingecko.com/api/v3"
 
 def _get_coin_id(ticker: str) -> str:
     """Resolve CoinGecko coin ID for a ticker."""
+
     resp = requests.get(f"{COINGECKO_API}/coins/list", timeout=30)
     resp.raise_for_status()
     coins = resp.json()
@@ -26,6 +28,7 @@ def _get_coin_id(ticker: str) -> str:
 def fetch_coin_info(ticker: str) -> Dict[str, float]:
     """Fetch current price (USD) and circulating supply for a ticker."""
     coin_id = _get_coin_id(ticker)
+
     data_resp = requests.get(f"{COINGECKO_API}/coins/{coin_id}", timeout=30)
     data_resp.raise_for_status()
     data = data_resp.json()
@@ -70,6 +73,7 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
         except Exception:
             continue
     raise ValueError(f"No OHLCV data available for {ticker}")
+
 
 
 def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]]) -> None:
