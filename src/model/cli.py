@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import logging
 
+
 from .crypto_data import fetch_coin_info, fetch_ohlcv, save_to_csv
 
 
@@ -18,6 +19,7 @@ def main() -> None:
 
     info = fetch_coin_info(args.ticker)
     ohlcv = fetch_ohlcv(args.ticker)
+
     filename = args.output or f"{args.ticker.upper()}_data.csv"
     save_to_csv(filename, info, ohlcv)
     print(f"Data written to {filename}")

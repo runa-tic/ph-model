@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+
 import ccxt
 import requests
 
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 def _get_coin_id(ticker: str) -> str:
     """Resolve CoinGecko coin ID for a ticker."""
+
     resp = requests.get(f"{COINGECKO_API}/coins/list", timeout=30)
     resp.raise_for_status()
     coins = resp.json()
@@ -30,6 +32,7 @@ def _get_coin_id(ticker: str) -> str:
 def fetch_coin_info(ticker: str) -> Dict[str, float]:
     """Fetch current price (USD) and circulating supply for a ticker."""
     coin_id = _get_coin_id(ticker)
+
     data_resp = requests.get(f"{COINGECKO_API}/coins/{coin_id}", timeout=30)
     data_resp.raise_for_status()
     data = data_resp.json()
@@ -67,6 +70,7 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
         logger.debug("Trying %s %s", exchange_name, symbol)
         try:
             exchange_class.load_markets()
+
             while True:
                 batch = exchange_class.fetch_ohlcv(symbol, timeframe=timeframe, since=since, limit=1000)
                 if not batch:
@@ -78,6 +82,7 @@ def fetch_ohlcv(ticker: str) -> List[List[float]]:
                 return all_data
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
+
             continue
     raise ValueError(f"No OHLCV data available for {ticker}")
 
