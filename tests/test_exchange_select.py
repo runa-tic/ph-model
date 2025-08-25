@@ -27,15 +27,17 @@ def test_fetch_ohlcv_specific_exchange(monkeypatch):
         symbols = ["AAA/USDT"]
 
         def __init__(self, params=None):
-            pass
+            self.called = False
 
         def load_markets(self):
             return
 
         def fetch_ohlcv(self, symbol, timeframe="1d", since=0, limit=1000):
-            if since > 0:
+            assert since > 0
+            if self.called:
                 return []
-            return [[0, 1, 2, 3, 4, 5]]
+            self.called = True
+            return [[since, 1, 2, 3, 4, 5]]
 
     fake_ccxt = types.SimpleNamespace(exchanges=["ex1", "ex2"], ex1=Ex1, ex2=Ex2)
     monkeypatch.setattr(crypto_data, "ccxt", fake_ccxt)
@@ -44,4 +46,4 @@ def test_fetch_ohlcv_specific_exchange(monkeypatch):
     monkeypatch.setattr("builtins.input", lambda _: "2")
 
     data = crypto_data.fetch_ohlcv("aaa")
-    assert data == [[0, 1, 2, 3, 4, 5]]
+    assert data[0][1:] == [1, 2, 3, 4, 5]

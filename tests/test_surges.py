@@ -11,7 +11,7 @@ def test_save_surge_snippets(tmp_path):
     day_ms = 24 * 60 * 60 * 1000
     ohlcv = [
         [0, 1.0, 1.5, 0.9, 1.2, 0.0],
-        [day_ms, 1.0, 2.5, 0.8, 2.0, 0.0],  # high is 2.5x the open -> surge
+        [day_ms, 1.0, 1.8, 0.8, 1.6, 0.0],  # high is 1.8x the open -> surge
         [2 * day_ms, 1.5, 1.6, 1.4, 1.5, 0.0],
     ]
 

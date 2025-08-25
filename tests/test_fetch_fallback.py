@@ -15,18 +15,20 @@ def test_fetch_ohlcv_generic_exchange(monkeypatch):
         symbols = ["FURY/USDT"]
 
         def __init__(self, params=None):
-            pass
+            self.called = False
 
         def load_markets(self):
             return
 
         def fetch_ohlcv(self, symbol, timeframe="1d", since=0, limit=1000):
-            if since > 0:
+            assert since > 0
+            if self.called:
                 return []
-            return [[0, 1, 2, 3, 4, 5]]
+            self.called = True
+            return [[since, 1, 2, 3, 4, 5]]
 
     fake_ccxt = types.SimpleNamespace(exchanges=["fake"], fake=FakeExchange)
     monkeypatch.setattr(crypto_data, "ccxt", fake_ccxt)
 
     data = crypto_data.fetch_ohlcv("fury")
-    assert data == [[0, 1, 2, 3, 4, 5]]
+    assert data[0][1:] == [1, 2, 3, 4, 5]

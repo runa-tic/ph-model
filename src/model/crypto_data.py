@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import csv
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Dict, List, Tuple
 
@@ -13,6 +13,9 @@ import requests
 
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
+
+MS_IN_DAY = 24 * 60 * 60 * 1000
+DAYS_LIMIT = 364
 
 
 logger = logging.getLogger(__name__)
@@ -91,10 +94,15 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
 
 
 def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
-    """Fetch OHLCV data from a specific exchange or fall back to CoinGecko."""
+    """Fetch up to the last ``DAYS_LIMIT`` days of OHLCV data.
+
+    Data is retrieved from ccxt exchanges when available; otherwise the
+    CoinGecko OHLC endpoint is used as a fallback.
+    """
 
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
+
     supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
     exchanges = sorted({ex for ex, _ in supported_markets})
 
@@ -122,11 +130,14 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
     attempted: set[str] = set()
     markets_to_try = [m for m in supported_markets if not exchange or m[0] == exchange]
 
+    now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
+    since_start = now_ms - DAYS_LIMIT * MS_IN_DAY
+
     for exchange_name, symbol in markets_to_try:
         attempted.add(exchange_name)
         exchange_class = getattr(ccxt, exchange_name)({"enableRateLimit": True})
         timeframe = "1d"
-        since = 0
+        since = since_start
         all_data: List[List[float]] = []
         logger.debug("Trying %s %s", exchange_name, symbol)
         try:
@@ -134,20 +145,24 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
 
             while True:
                 batch = exchange_class.fetch_ohlcv(
-                    symbol, timeframe=timeframe, since=since, limit=1000
+                    symbol, timeframe=timeframe, since=since, limit=DAYS_LIMIT
                 )
                 if not batch:
                     break
                 all_data.extend(batch)
-                since = batch[-1][0] + 24 * 60 * 60 * 1000
+                if len(all_data) >= DAYS_LIMIT:
+                    all_data = all_data[-DAYS_LIMIT:]
+                    break
+                since = batch[-1][0] + MS_IN_DAY
             if all_data:
                 logger.info(
                     "Fetched %d rows from %s %s", len(all_data), exchange_name, symbol
                 )
-                return all_data
+                return all_data[-DAYS_LIMIT:]
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
             continue
+
     # Try common trading pairs on selected or all exchanges before using CoinGecko
     base_symbol = ticker.upper()
     generic_pairs = [
@@ -170,33 +185,37 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
             if symbol not in getattr(exchange_class, "symbols", []):
                 continue
             timeframe = "1d"
-            since = 0
+            since = since_start
             all_data: List[List[float]] = []
             logger.debug("Trying %s %s", exchange_name, symbol)
             try:
                 while True:
                     batch = exchange_class.fetch_ohlcv(
-                        symbol, timeframe=timeframe, since=since, limit=1000
+                        symbol, timeframe=timeframe, since=since, limit=DAYS_LIMIT
                     )
                     if not batch:
                         break
                     all_data.extend(batch)
-                    since = batch[-1][0] + 24 * 60 * 60 * 1000
+                    if len(all_data) >= DAYS_LIMIT:
+                        all_data = all_data[-DAYS_LIMIT:]
+                        break
+                    since = batch[-1][0] + MS_IN_DAY
                 if all_data:
                     logger.info(
                         "Fetched %d rows from %s %s", len(all_data), exchange_name, symbol
                     )
-                    return all_data
+                    return all_data[-DAYS_LIMIT:]
             except Exception as exc:
                 logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
                 break
+
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
     coin_id = _get_coin_id(ticker)
     try:
         resp = requests.get(
             f"{COINGECKO_API}/coins/{coin_id}/ohlc",
-            params={"vs_currency": "usd", "days": "max"},
+            params={"vs_currency": "usd", "days": DAYS_LIMIT},
             timeout=30,
         )
         resp.raise_for_status()
@@ -208,6 +227,8 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
     data = resp.json()
     if not data:
         raise ValueError(f"No OHLCV data available for {ticker}")
+
+    data = data[-DAYS_LIMIT:]
 
     # CoinGecko's OHLC endpoint does not provide volume; set it to 0.0
     return [row + [0.0] for row in data]
@@ -234,9 +255,11 @@ def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]])
 
 
 def save_surge_snippets(
-    filename: str, ohlcv: List[List[float]], multiplier: float = 2.0
+    filename: str, ohlcv: List[List[float]], multiplier: float = 1.75
 ) -> None:
     """Save windows around days where intraday high crosses ``multiplier``× open.
+
+    ``multiplier`` defaults to ``1.75`` (75% surge).
 
     For each day where ``high / open`` is at least ``multiplier``, write a five-day
     window (two days before and after the surge) to ``filename``. The CSV includes
