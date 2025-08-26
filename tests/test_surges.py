@@ -18,7 +18,8 @@ def test_save_surge_snippets(tmp_path):
     ]
 
     out_file = tmp_path / "surges.csv"
-    save_surge_snippets(str(out_file), ohlcv, multiplier=2.0)
+    supply = 1000.0
+    save_surge_snippets(str(out_file), ohlcv, supply, multiplier=2.0)
 
     with open(out_file, newline="") as f:
         rows = list(csv.reader(f))
@@ -29,10 +30,13 @@ def test_save_surge_snippets(tmp_path):
     # There should be exactly five rows of data for the surge window
     assert len(data_rows) == 5
 
-    # Column for ph_volume should exist
+    # Columns for ph_volume and ph_percentage should exist
     assert "ph_volume" in header
+    assert "ph_percentage" in header
 
     # Locate the surge day row
     surge_row = next(r for r in data_rows if r[7] == "1")
     ph_volume_idx = header.index("ph_volume")
+    ph_percentage_idx = header.index("ph_percentage")
     assert float(surge_row[ph_volume_idx]) == 75.0
+    assert float(surge_row[ph_percentage_idx]) == 0.075

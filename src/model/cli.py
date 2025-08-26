@@ -34,7 +34,7 @@ def main() -> None:
     print(f"Data written to {filename}")
 
     surge_filename = filename.replace("_data", "_surges")
-    save_surge_snippets(surge_filename, ohlcv)
+    save_surge_snippets(surge_filename, ohlcv, info["circulating_supply"])
     print(f"Surge snippets written to {surge_filename}")
 
 

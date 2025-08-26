@@ -255,15 +255,22 @@ def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]])
 
 
 def save_surge_snippets(
-    filename: str, ohlcv: List[List[float]], multiplier: float = 1.75
+    filename: str,
+    ohlcv: List[List[float]],
+    supply: float,
+    multiplier: float = 1.75,
 ) -> None:
     """Save windows around days where intraday high crosses ``multiplier``× open.
 
     ``multiplier`` defaults to ``1.75`` (75% surge).
 
+    ``supply`` is the circulating supply of the token and is used to compute
+    ``ph_percentage`` (``ph_volume`` divided by supply).
+
     For each day where ``high / open`` is at least ``multiplier``, write a five-day
     window (two days before and after the surge) to ``filename``. The CSV includes
-    an ``event_id`` to group rows and ``is_event_day`` flag.
+    an ``event_id`` to group rows, ``is_event_day`` flag, and ``ph_volume``/
+    ``ph_percentage`` columns.
     """
 
     with open(filename, "w", newline="") as f:
@@ -279,6 +286,7 @@ def save_surge_snippets(
                 "volume",
                 "is_event_day",
                 "ph_volume",
+                "ph_percentage",
             ]
         )
         event_id = 1
@@ -294,6 +302,7 @@ def save_surge_snippets(
                         surrounding.append(ohlcv[j][5])
                 avg_surrounding = sum(surrounding) / len(surrounding) if surrounding else 0.0
                 ph_volume = volume - avg_surrounding
+                ph_percentage = ph_volume / supply if supply else 0.0
 
                 for j in range(start, end):
                     ts2, o2, h2, l2, c2, v2 = ohlcv[j]
@@ -308,6 +317,7 @@ def save_surge_snippets(
                             v2,
                             1 if j == i else 0,
                             ph_volume,
+                            ph_percentage,
                         ]
                     )
                 writer.writerow([])
