@@ -325,3 +325,78 @@ def save_surge_snippets(
                 event_id += 1
 
     return sum(averages) / len(averages) if averages else 0.0
+
+
+def save_buyback_model(
+    filename: str,
+    price: float,
+    supply: float,
+    ph_percentage: float,
+    price_step_pct: float,
+    q_pct: float,
+) -> None:
+    """Create a buyback model CSV based on selling pressure parameters.
+
+    ``price`` and ``supply`` come from CoinGecko. ``ph_percentage`` is the
+    average paper-hands percentage computed from surge snippets. ``price_step_pct``
+    specifies how much the price increases at each step (e.g. 5 for 5%), and
+    ``q_pct`` is the percentage increase in sell volume per step (e.g. 1 for a
+    1% increase).
+
+    The resulting CSV contains a row for each price level until the cumulative
+    tokens sold reaches the target ``supply * ph_percentage``.
+    """
+
+    tokens_to_sell = supply * ph_percentage
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "step",
+                "x",
+                "price_usd",
+                "tokens_sold",
+                "tokens_sold_cumulative",
+                "usd_value",
+                "usd_value_cumulative",
+                "weighted_avg_price",
+                "freefloat",
+                "buy_in_tokens",
+            ]
+        )
+
+        if tokens_to_sell <= 0:
+            return
+
+        step_inc = price_step_pct / 100.0
+        q_factor = 1.0 + q_pct / 100.0
+        tokens_step = tokens_to_sell * step_inc
+        step = 1
+        price_mult = 1.0
+        sold_cum = 0.0
+        usd_cum = 0.0
+        while sold_cum < tokens_to_sell and tokens_step > 0:
+            price_level = price * price_mult
+            sell_now = min(tokens_step, tokens_to_sell - sold_cum)
+            sold_cum += sell_now
+            usd_now = sell_now * price_level
+            usd_cum += usd_now
+            weighted_avg = usd_cum / sold_cum if sold_cum else 0.0
+            freefloat = supply - sold_cum
+            writer.writerow(
+                [
+                    step,
+                    round(price_mult, 2),
+                    price_level,
+                    sell_now,
+                    sold_cum,
+                    usd_now,
+                    usd_cum,
+                    weighted_avg,
+                    freefloat,
+                    sold_cum,
+                ]
+            )
+            tokens_step *= q_factor
+            price_mult += step_inc
+            step += 1

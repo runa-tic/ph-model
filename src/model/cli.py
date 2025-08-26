@@ -8,6 +8,7 @@ import logging
 from .crypto_data import (
     fetch_coin_info,
     fetch_ohlcv,
+    save_buyback_model,
     save_surge_snippets,
     save_to_csv,
 )
@@ -37,6 +38,24 @@ def main() -> None:
     avg = save_surge_snippets(surge_filename, ohlcv, info["circulating_supply"])
     print(f"Surge snippets written to {surge_filename}")
     print(f"Average PH percentage: {avg}")
+
+    try:
+        step_pct = float(input("Price step percentage: "))
+        q_pct = float(input("Increase in sell rate q percentage: "))
+    except ValueError:
+        print("Invalid numeric input")
+        return
+
+    buyback_filename = filename.replace("_data", "_buyback")
+    save_buyback_model(
+        buyback_filename,
+        info["price"],
+        info["circulating_supply"],
+        avg,
+        step_pct,
+        q_pct,
+    )
+    print(f"Buyback model written to {buyback_filename}")
 
 
 if __name__ == "__main__":
