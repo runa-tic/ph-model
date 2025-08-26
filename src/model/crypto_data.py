@@ -332,19 +332,20 @@ def save_buyback_model(
     price: float,
     supply: float,
     ph_percentage: float,
-    price_step_pct: float,
+    final_price: float,
     q_pct: float,
 ) -> None:
     """Create a buyback model CSV based on selling pressure parameters.
 
     ``price`` and ``supply`` come from CoinGecko. ``ph_percentage`` is the
-    average paper-hands percentage computed from surge snippets. ``price_step_pct``
-    specifies how much the price increases at each step (e.g. 5 for 5%), and
-    ``q_pct`` is the percentage increase in sell volume per step (e.g. 1 for a
-    1% increase).
+    average paper-hands percentage computed from surge snippets. ``final_price``
+    specifies the last price level to model. Each row increases the price by a
+    fixed 5% step. ``q_pct`` is the percentage increase in sell volume per step
+    (e.g. 1 for a 1% increase).
 
-    The resulting CSV contains a row for each price level until the cumulative
-    tokens sold reaches the target ``supply * ph_percentage``.
+    The resulting CSV contains a row for each 5%% price step until the price meets
+    or exceeds ``final_price`` or the cumulative tokens sold reaches
+    ``supply * ph_percentage``.
     """
 
     tokens_to_sell = supply * ph_percentage
@@ -367,17 +368,17 @@ def save_buyback_model(
 
         if tokens_to_sell <= 0:
             return
-
-        step_inc = price_step_pct / 100.0
+        step_inc = 0.05
         q_factor = 1.0 + q_pct / 100.0
         tokens_step = tokens_to_sell * step_inc
         step = 1
         price_mult = 1.0
         sold_cum = 0.0
         usd_cum = 0.0
-        while sold_cum < tokens_to_sell and tokens_step > 0:
+        while True:
             price_level = price * price_mult
-            sell_now = min(tokens_step, tokens_to_sell - sold_cum)
+            remaining = max(tokens_to_sell - sold_cum, 0.0)
+            sell_now = min(tokens_step, remaining)
             sold_cum += sell_now
             usd_now = sell_now * price_level
             usd_cum += usd_now
@@ -397,6 +398,8 @@ def save_buyback_model(
                     sold_cum,
                 ]
             )
+            if price_level >= final_price:
+                break
             tokens_step *= q_factor
             price_mult += step_inc
             step += 1

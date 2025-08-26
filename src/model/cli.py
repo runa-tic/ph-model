@@ -40,7 +40,7 @@ def main() -> None:
     print(f"Average PH percentage: {avg}")
 
     try:
-        step_pct = float(input("Price step percentage: "))
+        final_price = float(input("Final desired price for buyback: "))
         q_pct = float(input("Increase in sell rate q percentage: "))
     except ValueError:
         print("Invalid numeric input")
@@ -52,7 +52,7 @@ def main() -> None:
         info["price"],
         info["circulating_supply"],
         avg,
-        step_pct,
+        final_price,
         q_pct,
     )
     print(f"Buyback model written to {buyback_filename}")
