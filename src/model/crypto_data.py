@@ -305,7 +305,6 @@ def save_surge_snippets(
                 ph_volume = volume - avg_surrounding
                 ph_percentage = ph_volume / supply if supply else 0.0
                 averages.append(ph_percentage)
-
                 for j in range(start, end):
                     ts2, o2, h2, l2, c2, v2 = ohlcv[j]
                     writer.writerow(
@@ -369,7 +368,6 @@ def save_buyback_model(
 
         if tokens_to_sell <= 0:
             return
-
         step_inc = 0.05
         q_factor = 1.0 + q_pct / 100.0
         tokens_step = tokens_to_sell * step_inc
