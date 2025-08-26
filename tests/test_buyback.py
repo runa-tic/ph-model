@@ -30,6 +30,8 @@ def test_save_buyback_model(tmp_path):
     last = data_rows[-1]
     assert float(last[2]) >= 0.05
     assert float(last[2]) <= 0.05 * 1.05
+    # sales should continue even after the estimated paper-hands pool is exceeded
     tokens_to_sell = supply * ph_percentage
-    assert float(last[4]) <= tokens_to_sell + 1
+    assert float(last[4]) > tokens_to_sell
     assert abs(float(last[8]) - (supply - float(last[4]))) < 1e-6
+    assert float(last[9]) == float(last[4])

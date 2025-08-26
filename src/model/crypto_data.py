@@ -344,8 +344,9 @@ def save_buyback_model(
     (e.g. 1 for a 1% increase).
 
     The resulting CSV contains a row for each 5%% price step until the price meets
-    or exceeds ``final_price`` or the cumulative tokens sold reaches
-    ``supply * ph_percentage``.
+    or exceeds ``final_price``. The model no longer halts when the estimated
+    paper-hands token pool runs out; sales continue geometrically regardless of
+    totals.
     """
 
     tokens_to_sell = supply * ph_percentage
@@ -377,8 +378,7 @@ def save_buyback_model(
         usd_cum = 0.0
         while True:
             price_level = price * price_mult
-            remaining = max(tokens_to_sell - sold_cum, 0.0)
-            sell_now = min(tokens_step, remaining)
+            sell_now = tokens_step
             sold_cum += sell_now
             usd_now = sell_now * price_level
             usd_cum += usd_now
