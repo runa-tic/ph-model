@@ -306,7 +306,6 @@ def save_surge_snippets(
                 ph_volume = volume - avg_surrounding
                 ph_percentage = ph_volume / supply if supply else 0.0
                 averages.append(ph_percentage)
-
                 for j in range(start, end):
                     ts2, o2, h2, l2, c2, v2 = ohlcv[j]
                     writer.writerow(
