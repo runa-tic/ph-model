@@ -410,3 +410,28 @@ def save_buyback_model(
             tokens_step *= q_factor
             price_mult += step_inc
             step += 1
+
+
+def plot_buyback_chart(csv_filename: str, image_filename: str) -> None:
+    """Plot price vs cumulative USD value from a buyback model CSV."""
+    prices: List[float] = []
+    usd_cum: List[float] = []
+    with open(csv_filename, newline="") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                prices.append(float(row["price_usd"]))
+                usd_cum.append(float(row["usd_value_cumulative"]))
+            except (KeyError, ValueError):
+                continue
+    if not prices:
+        return
+    import matplotlib.pyplot as plt
+
+    plt.figure()
+    plt.plot(prices, usd_cum)
+    plt.xlabel("Price (USD)")
+    plt.ylabel("Cumulative USD value")
+    plt.title("Buyback schedule")
+    plt.savefig(image_filename)
+    plt.close()

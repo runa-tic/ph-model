@@ -8,6 +8,7 @@ import logging
 from .crypto_data import (
     fetch_coin_info,
     fetch_ohlcv,
+    plot_buyback_chart,
     save_buyback_model,
     save_surge_snippets,
     save_to_csv,
@@ -56,6 +57,9 @@ def main() -> None:
         q_pct,
     )
     print(f"Buyback model written to {buyback_filename}")
+    chart_file = buyback_filename.replace(".csv", ".png")
+    plot_buyback_chart(buyback_filename, chart_file)
+    print(f"Buyback chart written to {chart_file}")
 
 
 if __name__ == "__main__":

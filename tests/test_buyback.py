@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
-from model.crypto_data import save_buyback_model
+from model.crypto_data import plot_buyback_chart, save_buyback_model
 
 
 def test_save_buyback_model(tmp_path):
@@ -17,6 +17,8 @@ def test_save_buyback_model(tmp_path):
     save_buyback_model(
         str(out_file), price, supply, ph_percentage, final_price=0.05, q_pct=1.0
     )
+    chart_file = tmp_path / "buyback.png"
+    plot_buyback_chart(str(out_file), str(chart_file))
 
     with open(out_file, newline="") as f:
         rows = list(csv.reader(f))
@@ -42,3 +44,4 @@ def test_save_buyback_model(tmp_path):
     assert abs(float(last[4]) - tokens_to_sell) < 1e-6
     assert abs(float(last[8]) - (supply - float(last[4]))) < 1e-6
     assert float(last[9]) == float(last[4])
+    assert chart_file.exists() and chart_file.stat().st_size > 0
