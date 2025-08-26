@@ -5,7 +5,12 @@ import argparse
 import logging
 
 
-from .crypto_data import fetch_coin_info, fetch_ohlcv, save_to_csv
+from .crypto_data import (
+    fetch_coin_info,
+    fetch_ohlcv,
+    save_surge_snippets,
+    save_to_csv,
+)
 
 
 def main() -> None:
@@ -17,12 +22,20 @@ def main() -> None:
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
-    info = fetch_coin_info(args.ticker)
-    ohlcv = fetch_ohlcv(args.ticker)
+    try:
+        info = fetch_coin_info(args.ticker)
+        ohlcv = fetch_ohlcv(args.ticker)
+    except ValueError as exc:
+        print(exc)
+        return
 
     filename = args.output or f"{args.ticker.upper()}_data.csv"
     save_to_csv(filename, info, ohlcv)
     print(f"Data written to {filename}")
+
+    surge_filename = filename.replace("_data", "_surges")
+    save_surge_snippets(surge_filename, ohlcv, info["circulating_supply"])
+    print(f"Surge snippets written to {surge_filename}")
 
 
 if __name__ == "__main__":
