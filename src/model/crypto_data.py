@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import math
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Dict, List, Tuple
@@ -369,9 +370,15 @@ def save_buyback_model(
 
         if tokens_to_sell <= 0:
             return
+
         step_inc = 0.05
         q_factor = 1.0 + q_pct / 100.0
-        tokens_step = tokens_to_sell * step_inc
+        # number of 5% steps required to reach the target price
+        steps = math.ceil((final_price / price - 1) / step_inc) + 1
+        if q_factor == 1.0:
+            tokens_step = tokens_to_sell / steps
+        else:
+            tokens_step = tokens_to_sell * (1 - q_factor) / (1 - q_factor ** steps)
         step = 1
         price_mult = 1.0
         sold_cum = 0.0
