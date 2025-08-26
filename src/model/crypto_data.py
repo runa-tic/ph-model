@@ -259,7 +259,7 @@ def save_surge_snippets(
     ohlcv: List[List[float]],
     supply: float,
     multiplier: float = 1.75,
-) -> None:
+) -> float:
     """Save windows around days where intraday high crosses ``multiplier``× open.
 
     ``multiplier`` defaults to ``1.75`` (75% surge).
@@ -273,6 +273,7 @@ def save_surge_snippets(
     ``ph_percentage`` columns.
     """
 
+    averages: List[float] = []
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
@@ -303,7 +304,7 @@ def save_surge_snippets(
                 avg_surrounding = sum(surrounding) / len(surrounding) if surrounding else 0.0
                 ph_volume = volume - avg_surrounding
                 ph_percentage = ph_volume / supply if supply else 0.0
-
+                averages.append(ph_percentage)
                 for j in range(start, end):
                     ts2, o2, h2, l2, c2, v2 = ohlcv[j]
                     writer.writerow(
@@ -322,3 +323,5 @@ def save_surge_snippets(
                     )
                 writer.writerow([])
                 event_id += 1
+
+    return sum(averages) / len(averages) if averages else 0.0

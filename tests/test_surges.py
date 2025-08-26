@@ -19,7 +19,7 @@ def test_save_surge_snippets(tmp_path):
 
     out_file = tmp_path / "surges.csv"
     supply = 1000.0
-    save_surge_snippets(str(out_file), ohlcv, supply, multiplier=2.0)
+    avg = save_surge_snippets(str(out_file), ohlcv, supply, multiplier=2.0)
 
     with open(out_file, newline="") as f:
         rows = list(csv.reader(f))
@@ -40,3 +40,19 @@ def test_save_surge_snippets(tmp_path):
     ph_percentage_idx = header.index("ph_percentage")
     assert float(surge_row[ph_volume_idx]) == 75.0
     assert float(surge_row[ph_percentage_idx]) == 0.075
+    assert avg == 0.075
+
+
+def test_average_multiple_events(tmp_path):
+    day_ms = 24 * 60 * 60 * 1000
+    ohlcv = [
+        [0, 1.0, 1.0, 0.9, 1.0, 10.0],
+        [day_ms, 1.0, 2.0, 0.9, 1.5, 100.0],  # surge1 (2x)
+        [2 * day_ms, 1.0, 1.0, 0.9, 1.0, 20.0],
+        [3 * day_ms, 1.0, 2.0, 0.9, 1.5, 80.0],  # surge2 (2x)
+        [4 * day_ms, 1.0, 1.0, 0.9, 1.0, 30.0],
+    ]
+    out_file = tmp_path / "surges2.csv"
+    avg = save_surge_snippets(str(out_file), ohlcv, 1000.0, multiplier=2.0)
+    expected = ((100.0 - (10.0 + 20.0 + 80.0) / 3) / 1000.0 + (80.0 - (100.0 + 20.0 + 30.0) / 3) / 1000.0) / 2
+    assert avg == expected
