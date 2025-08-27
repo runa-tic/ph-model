@@ -82,6 +82,3 @@ increase. The number of tokens sold at each step grows geometrically by `q`
 percent. The model uses the average `ph_percentage` computed from surge snippets
 to estimate total tokens sold and produces a cumulative USD value chart.
 
-## License
-
-MIT
