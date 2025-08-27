@@ -1,15 +1,87 @@
 # ph-model
 
-A simple CLI tool that gathers cryptocurrency information from CoinGecko and
-historical OHLCV data from an exchange via ccxt.
+A command-line tool for analysing cryptocurrency price surges and modelling
+paper-hands token buybacks.
+
+## Features
+
+- Fetch current USD price and circulating supply from CoinGecko.
+- Retrieve up to the last 364 days of daily OHLCV candles from an exchange via
+  [ccxt](https://github.com/ccxt/ccxt) with automatic fallbacks to CoinGecko.
+- Detect days where the intraday high is at least 75% above the open price and
+  export five-day "surge snippets" that include `ph_volume` and `ph_percentage`
+  metrics.
+- Compute the average paper-hands percentage across all surge events.
+- Build a geometric buyback model using 5% price steps and a user-supplied
+  increase in sell rate, saving both a CSV and a PNG chart.
+
+## Installation
+
+1. **Clone the repository**
+
+    ```bash
+    git clone https://github.com/your-org/ph-model.git
+    cd ph-model
+    ```
+
+2. **Create a virtual environment** *(recommended)*
+
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    ```
+
+3. **Install dependencies**
+
+    ```bash
+    pip install -e .
+    ```
+
+4. **Run the test suite** *(optional but recommended)*
+
+    ```bash
+    pytest -q
+    ```
 
 ## Usage
+
+```bash
+python -m model.cli <ticker>
+```
+
+Example:
 
 ```bash
 python -m model.cli btc
 ```
 
-The script saves a CSV file combining the current price, circulating supply and
-all available daily OHLCV data. The exchange is chosen automatically from the
-active markets listed on CoinGecko. Use the `--debug` flag to print detailed
-information about which exchanges are being queried.
+Running the command performs the following steps:
+
+1. Fetch matching coins from CoinGecko and prompt you to choose the correct one
+   if several share the same ticker.
+2. Discover markets for the coin and ask for an exchange when multiple options
+   are available.
+3. Download up to 364 days of OHLCV data from the chosen exchange or, if
+   exchanges fail, from CoinGecko.
+4. Write `<TICKER>_data.csv` containing the current price, circulating supply
+   and OHLCV history.
+5. Generate `<TICKER>_surges.csv` with five-day windows around every surge where
+   `high / open >= 1.75`, including `ph_volume` and `ph_percentage` columns, and
+   print the average paper-hands percentage.
+6. Prompt for a final buyback price and a percentage `q` increase in sell rate,
+   then create `<TICKER>_buyback.csv` together with a chart
+   `<TICKER>_buyback.png`.
+
+Use the `--debug` flag to print detailed logging while the tool runs.
+
+## Buyback model
+
+The buyback schedule models how many tokens are repurchased to reach a desired
+final price. Starting from the current price, each row represents a 5% price
+increase. The number of tokens sold at each step grows geometrically by `q`
+percent. The model uses the average `ph_percentage` computed from surge snippets
+to estimate total tokens sold and produces a cumulative USD value chart.
+
+## License
+
+MIT
