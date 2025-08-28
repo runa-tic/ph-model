@@ -69,7 +69,18 @@ def fetch_coin_info(ticker: str) -> Dict[str, float]:
         ) from exc
     data = data_resp.json()
     price = data["market_data"]["current_price"]["usd"]
-    supply = data["market_data"]["circulating_supply"]
+    supply = data["market_data"].get("circulating_supply")
+    if not supply:
+        print("Failed to fetch circulating supply from CoinGecko.")
+        while True:
+            user_input = input("Please enter the circulating supply manually: ")
+            try:
+                supply = float(user_input)
+                if supply > 0:
+                    break
+            except ValueError:
+                pass
+            print("Invalid input. Enter a positive number.")
     return {"price": price, "circulating_supply": supply}
 
 
