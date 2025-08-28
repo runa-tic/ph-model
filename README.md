@@ -20,7 +20,7 @@ paper-hands token buybacks.
 1. **Clone the repository**
 
     ```bash
-    git clone https://github.com/your-org/ph-model.git
+    git clone https://github.com/runa-tic/ph-model.git
     cd ph-model
     ```
 
@@ -28,7 +28,7 @@ paper-hands token buybacks.
 
     ```bash
     python -m venv .venv
-    source .venv/bin/activate
+    source .venv/bin/activate #source .venv/scripts/activate
     ```
 
 3. **Install dependencies**
