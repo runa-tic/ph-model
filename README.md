@@ -28,7 +28,7 @@ paper-hands token buybacks.
 
     ```bash
     python -m venv .venv
-    source .venv/bin/activate #source .venv/scripts/activate
+    source .venv/bin/activate #.venv\Scripts\activate
     ```
 
 3. **Install dependencies**
