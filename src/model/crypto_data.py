@@ -339,6 +339,83 @@ def save_surge_snippets(
     return sum(averages) / len(averages) if averages else 0.0
 
 
+def save_selloff_snippets(
+    filename: str,
+    ohlcv: List[List[float]],
+    supply: float,
+    multiplier: float = 0.5,
+) -> float:
+    """Save windows around days where intraday low falls below ``multiplier``× open.
+
+    ``multiplier`` defaults to ``0.5`` (50% dump).
+
+    ``supply`` is the circulating supply of the token and is used to compute
+    ``ph_percentage`` (``ph_volume`` divided by supply).
+
+    For each day where ``low / open`` is at most ``multiplier``, write a five-day
+    window (two days before and after the selloff) to ``filename``. The CSV
+    mirrors :func:`save_surge_snippets` and includes ``event_id`` to group rows,
+    ``is_event_day`` flag, and ``ph_volume``/``ph_percentage`` columns.
+    """
+
+    averages: List[float] = []
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "event_id",
+                "date",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "is_event_day",
+                "ph_volume",
+                "ph_percentage",
+            ]
+        )
+        event_id = 1
+        for i, (ts, open_, high, low, close, volume) in enumerate(ohlcv):
+            if open_ > 0 and (low / open_) <= multiplier:
+                start = max(0, i - 2)
+                end = min(len(ohlcv), i + 3)
+
+                surrounding: List[float] = []
+                for offset in (-2, -1, 1, 2):
+                    j = i + offset
+                    if 0 <= j < len(ohlcv):
+                        surrounding.append(ohlcv[j][5])
+                avg_surrounding = (
+                    sum(surrounding) / len(surrounding) if surrounding else 0.0
+                )
+                ph_volume = volume - avg_surrounding
+                ph_percentage = ph_volume / supply if supply else 0.0
+                averages.append(ph_percentage)
+                for j in range(start, end):
+                    ts2, o2, h2, l2, c2, v2 = ohlcv[j]
+                    writer.writerow(
+                        [
+                            event_id,
+                            datetime.utcfromtimestamp(ts2 / 1000).strftime(
+                                "%d-%m-%Y"
+                            ),
+                            o2,
+                            h2,
+                            l2,
+                            c2,
+                            v2,
+                            1 if j == i else 0,
+                            ph_volume,
+                            ph_percentage,
+                        ]
+                    )
+                writer.writerow([])
+                event_id += 1
+
+    return sum(averages) / len(averages) if averages else 0.0
+
+
 def save_buyback_model(
     filename: str,
     price: float,
@@ -346,19 +423,20 @@ def save_buyback_model(
     ph_percentage: float,
     final_price: float,
     q_pct: float,
+    step_pct: float = 5.0,
 ) -> None:
     """Create a buyback model CSV based on selling pressure parameters.
 
     ``price`` and ``supply`` come from CoinGecko. ``ph_percentage`` is the
     average paper-hands percentage computed from surge snippets. ``final_price``
     specifies the last price level to model. Each row increases the price by a
-    fixed 5% step. ``q_pct`` is the percentage increase in sell volume per step
-    (e.g. 1 for a 1% increase).
+    configurable ``step_pct`` percentage (default 5%). ``q_pct`` is the
+    percentage increase in sell volume per step (e.g. 1 for a 1% increase).
 
-    The resulting CSV contains a row for each 5%% price step until the price meets
-    or exceeds ``final_price``. The model no longer halts when the estimated
-    paper-hands token pool runs out; sales continue geometrically regardless of
-    totals.
+    The resulting CSV contains a row for each ``step_pct`` price step until the
+    price meets or exceeds ``final_price``. The model no longer halts when the
+    estimated paper-hands token pool runs out; sales continue geometrically
+    regardless of totals.
     """
 
     tokens_to_sell = supply * ph_percentage
@@ -382,9 +460,9 @@ def save_buyback_model(
         if tokens_to_sell <= 0:
             return
 
-        step_inc = 0.05
+        step_inc = step_pct / 100.0
         q_factor = 1.0 + q_pct / 100.0
-        # number of 5% steps required to reach the target price
+        # number of steps required to reach the target price
         steps = math.ceil((final_price / price - 1) / step_inc) + 1
         if q_factor == 1.0:
             tokens_step = tokens_to_sell / steps
@@ -420,6 +498,87 @@ def save_buyback_model(
                 break
             tokens_step *= q_factor
             price_mult += step_inc
+            step += 1
+
+
+def save_liquidation_model(
+    filename: str,
+    price: float,
+    supply: float,
+    ph_percentage: float,
+    final_price: float,
+    q_pct: float,
+    step_pct: float = 5.0,
+) -> None:
+    """Create a liquidation model CSV based on dumping pressure parameters.
+
+    ``price`` and ``supply`` come from CoinGecko. ``ph_percentage`` is the
+    average paper-hands percentage computed from selloff snippets. ``final_price``
+    specifies the last price level to model (typically below the current price).
+    Each row decreases the price by a configurable ``step_pct`` percentage
+    (default 5%). ``q_pct`` is the percentage increase in sell volume per step
+    (e.g. 1 for a 1% increase).
+    """
+
+    tokens_to_sell = supply * ph_percentage
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "step",
+                "x",
+                "price_usd",
+                "tokens_sold",
+                "tokens_sold_cumulative",
+                "usd_value",
+                "usd_value_cumulative",
+                "weighted_avg_price",
+                "freefloat",
+                "sell_out_tokens",
+            ]
+        )
+
+        if tokens_to_sell <= 0:
+            return
+
+        step_inc = step_pct / 100.0
+        q_factor = 1.0 + q_pct / 100.0
+        steps = max(1, math.ceil((1 - final_price / price) / step_inc) + 1)
+        if q_factor == 1.0:
+            tokens_step = tokens_to_sell / steps
+        else:
+            tokens_step = tokens_to_sell * (1 - q_factor) / (1 - q_factor ** steps)
+
+        step = 1
+        price_mult = 1.0
+        sold_cum = 0.0
+        usd_cum = 0.0
+        while True:
+            price_level = price * price_mult
+            sell_now = tokens_step
+            sold_cum += sell_now
+            usd_now = sell_now * price_level
+            usd_cum += usd_now
+            weighted_avg = usd_cum / sold_cum if sold_cum else 0.0
+            freefloat = supply + sold_cum
+            writer.writerow(
+                [
+                    step,
+                    round(price_mult, 2),
+                    price_level,
+                    sell_now,
+                    sold_cum,
+                    usd_now,
+                    usd_cum,
+                    weighted_avg,
+                    freefloat,
+                    sold_cum,
+                ]
+            )
+            if price_level <= final_price:
+                break
+            tokens_step *= q_factor
+            price_mult -= step_inc
             step += 1
 
 
