@@ -39,9 +39,21 @@ def main() -> None:
 
     mode = input("Select mode: buyback or liquidation (b/l): ").strip().lower()
     if mode.startswith("b"):
+        try:
+            pct_input = input(
+                "Minimum intraday surge percentage (default 75): "
+            ).strip()
+            surge_pct = float(pct_input) if pct_input else 75.0
+        except ValueError:
+            print("Invalid numeric input")
+            return
+        surge_pct = abs(surge_pct)
         surge_filename = filename.replace("_data", "_surges")
         avg = save_surge_snippets(
-            surge_filename, ohlcv, info["circulating_supply"]
+            surge_filename,
+            ohlcv,
+            info["circulating_supply"],
+            1 + surge_pct / 100,
         )
         print(f"Surge snippets written to {surge_filename}")
         print(f"Average PH percentage: {avg}")
@@ -67,9 +79,21 @@ def main() -> None:
         plot_buyback_chart(buyback_filename, chart_file)
         print(f"Buyback chart written to {chart_file}")
     elif mode.startswith("l"):
+        try:
+            pct_input = input(
+                "Maximum intraday selloff percentage (default -50): "
+            ).strip()
+            selloff_pct = float(pct_input) if pct_input else -50.0
+        except ValueError:
+            print("Invalid numeric input")
+            return
+        selloff_pct = -abs(selloff_pct)
         selloff_filename = filename.replace("_data", "_selloffs")
         avg = save_selloff_snippets(
-            selloff_filename, ohlcv, info["circulating_supply"]
+            selloff_filename,
+            ohlcv,
+            info["circulating_supply"],
+            1 + selloff_pct / 100,
         )
         print(f"Selloff snippets written to {selloff_filename}")
         print(f"Average PH percentage: {avg}")
