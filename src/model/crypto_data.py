@@ -423,19 +423,20 @@ def save_buyback_model(
     ph_percentage: float,
     final_price: float,
     q_pct: float,
+    step_pct: float = 5.0,
 ) -> None:
     """Create a buyback model CSV based on selling pressure parameters.
 
     ``price`` and ``supply`` come from CoinGecko. ``ph_percentage`` is the
     average paper-hands percentage computed from surge snippets. ``final_price``
     specifies the last price level to model. Each row increases the price by a
-    fixed 5% step. ``q_pct`` is the percentage increase in sell volume per step
-    (e.g. 1 for a 1% increase).
+    configurable ``step_pct`` percentage (default 5%). ``q_pct`` is the
+    percentage increase in sell volume per step (e.g. 1 for a 1% increase).
 
-    The resulting CSV contains a row for each 5%% price step until the price meets
-    or exceeds ``final_price``. The model no longer halts when the estimated
-    paper-hands token pool runs out; sales continue geometrically regardless of
-    totals.
+    The resulting CSV contains a row for each ``step_pct`` price step until the
+    price meets or exceeds ``final_price``. The model no longer halts when the
+    estimated paper-hands token pool runs out; sales continue geometrically
+    regardless of totals.
     """
 
     tokens_to_sell = supply * ph_percentage
@@ -459,9 +460,9 @@ def save_buyback_model(
         if tokens_to_sell <= 0:
             return
 
-        step_inc = 0.05
+        step_inc = step_pct / 100.0
         q_factor = 1.0 + q_pct / 100.0
-        # number of 5% steps required to reach the target price
+        # number of steps required to reach the target price
         steps = math.ceil((final_price / price - 1) / step_inc) + 1
         if q_factor == 1.0:
             tokens_step = tokens_to_sell / steps
@@ -507,14 +508,16 @@ def save_liquidation_model(
     ph_percentage: float,
     final_price: float,
     q_pct: float,
+    step_pct: float = 5.0,
 ) -> None:
     """Create a liquidation model CSV based on dumping pressure parameters.
 
     ``price`` and ``supply`` come from CoinGecko. ``ph_percentage`` is the
     average paper-hands percentage computed from selloff snippets. ``final_price``
     specifies the last price level to model (typically below the current price).
-    Each row decreases the price by a fixed 5% step. ``q_pct`` is the percentage
-    increase in sell volume per step (e.g. 1 for a 1% increase).
+    Each row decreases the price by a configurable ``step_pct`` percentage
+    (default 5%). ``q_pct`` is the percentage increase in sell volume per step
+    (e.g. 1 for a 1% increase).
     """
 
     tokens_to_sell = supply * ph_percentage
@@ -538,7 +541,7 @@ def save_liquidation_model(
         if tokens_to_sell <= 0:
             return
 
-        step_inc = 0.05
+        step_inc = step_pct / 100.0
         q_factor = 1.0 + q_pct / 100.0
         steps = max(1, math.ceil((1 - final_price / price) / step_inc) + 1)
         if q_factor == 1.0:

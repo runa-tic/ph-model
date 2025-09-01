@@ -61,6 +61,10 @@ def main() -> None:
         try:
             final_price = float(input("Final desired price for buyback: "))
             q_pct = float(input("Increase in sell rate q percentage: "))
+            step_input = input(
+                "Price step percentage for schedule (default 5): "
+            ).strip()
+            step_pct = float(step_input) if step_input else 5.0
         except ValueError:
             print("Invalid numeric input")
             return
@@ -73,6 +77,7 @@ def main() -> None:
             avg,
             final_price,
             q_pct,
+            step_pct,
         )
         print(f"Buyback model written to {buyback_filename}")
         chart_file = buyback_filename.replace(".csv", ".png")
@@ -101,6 +106,10 @@ def main() -> None:
         try:
             final_price = float(input("Final desired price for liquidation: "))
             q_pct = float(input("Increase in sell rate q percentage: "))
+            step_input = input(
+                "Price step percentage for schedule (default 5): "
+            ).strip()
+            step_pct = float(step_input) if step_input else 5.0
         except ValueError:
             print("Invalid numeric input")
             return
@@ -113,6 +122,7 @@ def main() -> None:
             avg,
             final_price,
             q_pct,
+            step_pct,
         )
         print(f"Liquidation model written to {liquidation_filename}")
     else:

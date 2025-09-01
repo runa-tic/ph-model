@@ -14,7 +14,7 @@ def test_save_liquidation_model(tmp_path):
     out_file = tmp_path / "liquidation.csv"
 
     save_liquidation_model(
-        str(out_file), price, supply, ph_percentage, final_price=0.01, q_pct=1.0
+        str(out_file), price, supply, ph_percentage, final_price=0.01, q_pct=1.0, step_pct=10.0
     )
 
     with open(out_file, newline="") as f:
@@ -27,7 +27,8 @@ def test_save_liquidation_model(tmp_path):
     first = data_rows[0]
     assert abs(float(first[2]) - price) < 1e-9
     tokens_to_sell = supply * ph_percentage
-    steps = math.ceil((1 - 0.01 / price) / 0.05) + 1
+    step_inc = 0.10
+    steps = math.ceil((1 - 0.01 / price) / step_inc) + 1
     q_factor = 1.0 + 1.0 / 100.0
     if q_factor == 1.0:
         expected_b1 = tokens_to_sell / steps
@@ -37,7 +38,7 @@ def test_save_liquidation_model(tmp_path):
 
     last = data_rows[-1]
     assert float(last[2]) <= 0.01
-    assert float(last[2]) >= 0.01 - price * 0.05
+    assert float(last[2]) >= 0.01 - price * step_inc
     assert abs(float(last[4]) - tokens_to_sell) < 1e-6
     assert abs(float(last[8]) - (supply + float(last[4]))) < 1e-6
     assert float(last[9]) == float(last[4])
