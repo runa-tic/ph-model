@@ -31,4 +31,5 @@ def test_fetch_ohlcv_generic_exchange(monkeypatch):
     monkeypatch.setattr(crypto_data, "ccxt", fake_ccxt)
 
     data = crypto_data.fetch_ohlcv("fury")
-    assert data[0][1:] == [1, 2, 3, 4, 5]
+    assert set(data.keys()) == {"fake"}
+    assert data["fake"][0][1:] == [1, 2, 3, 4, 5]

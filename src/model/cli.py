@@ -28,14 +28,22 @@ def main() -> None:
 
     try:
         info = fetch_coin_info(args.ticker)
-        ohlcv = fetch_ohlcv(args.ticker)
+        ohlcv_map = fetch_ohlcv(args.ticker)
     except ValueError as exc:
         print(exc)
         return
 
-    filename = args.output or f"{args.ticker.upper()}_data.csv"
-    save_to_csv(filename, info, ohlcv)
-    print(f"Data written to {filename}")
+    if not ohlcv_map:
+        print("No OHLCV data available")
+        return
+
+    base = args.output or args.ticker.upper()
+    if base.lower().endswith('.csv'):
+        base = base[:-4]
+    for ex, data in ohlcv_map.items():
+        filename = f"{base}_{ex}_data.csv"
+        save_to_csv(filename, info, data)
+        print(f"Data written to {filename}")
 
     mode = input("Select mode: buyback or liquidation (b/l): ").strip().lower()
     if mode.startswith("b"):
@@ -48,14 +56,19 @@ def main() -> None:
             print("Invalid numeric input")
             return
         surge_pct = abs(surge_pct)
-        surge_filename = filename.replace("_data", "_surges")
-        avg = save_surge_snippets(
-            surge_filename,
-            ohlcv,
-            info["circulating_supply"],
-            1 + surge_pct / 100,
-        )
-        print(f"Surge snippets written to {surge_filename}")
+        avgs = []
+        for ex, data in ohlcv_map.items():
+            surge_filename = f"{base}_{ex}_surges.csv"
+            avg = save_surge_snippets(
+                surge_filename,
+                data,
+                info["circulating_supply"],
+                1 + surge_pct / 100,
+            )
+            print(f"Surge snippets written to {surge_filename}")
+            print(f"Average PH percentage on {ex}: {avg}")
+            avgs.append(avg)
+        avg = sum(avgs) / len(avgs) if avgs else 0.0
         print(f"Average PH percentage: {avg}")
 
         try:
@@ -68,8 +81,7 @@ def main() -> None:
         except ValueError:
             print("Invalid numeric input")
             return
-
-        buyback_filename = filename.replace("_data", "_buyback")
+        buyback_filename = f"{base}_buyback.csv"
         save_buyback_model(
             buyback_filename,
             info["price"],
@@ -93,14 +105,19 @@ def main() -> None:
             print("Invalid numeric input")
             return
         selloff_pct = -abs(selloff_pct)
-        selloff_filename = filename.replace("_data", "_selloffs")
-        avg = save_selloff_snippets(
-            selloff_filename,
-            ohlcv,
-            info["circulating_supply"],
-            1 + selloff_pct / 100,
-        )
-        print(f"Selloff snippets written to {selloff_filename}")
+        avgs = []
+        for ex, data in ohlcv_map.items():
+            selloff_filename = f"{base}_{ex}_selloffs.csv"
+            avg = save_selloff_snippets(
+                selloff_filename,
+                data,
+                info["circulating_supply"],
+                1 + selloff_pct / 100,
+            )
+            print(f"Selloff snippets written to {selloff_filename}")
+            print(f"Average PH percentage on {ex}: {avg}")
+            avgs.append(avg)
+        avg = sum(avgs) / len(avgs) if avgs else 0.0
         print(f"Average PH percentage: {avg}")
 
         try:
@@ -115,8 +132,7 @@ def main() -> None:
         except ValueError:
             print("Invalid numeric input")
             return
-
-        liquidation_filename = filename.replace("_data", "_liquidation")
+        liquidation_filename = f"{base}_liquidation.csv"
         save_liquidation_model(
             liquidation_filename,
             info["price"],
