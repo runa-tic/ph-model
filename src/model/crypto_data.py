@@ -19,6 +19,38 @@ MS_IN_DAY = 24 * 60 * 60 * 1000
 DAYS_LIMIT = 364
 
 
+# CoinGecko only accepts a limited set of "days" parameters for its OHLC
+# endpoint.  Use the smallest allowed value greater than or equal to the
+# desired ``DAYS_LIMIT``.  This prevents HTTP 400 errors such as the
+# ``{"error":"Invalid days parameter"}`` seen when requesting 364 days.
+COINGECKO_ALLOWED_DAYS = [1, 7, 14, 30, 90, 180, 365, 730]
+
+
+def _coingecko_days(limit: int) -> int:
+    """Return a valid ``days`` value for CoinGecko's OHLC endpoint."""
+
+    for day in COINGECKO_ALLOWED_DAYS:
+        if limit <= day:
+            return day
+    return COINGECKO_ALLOWED_DAYS[-1]
+
+
+# Map CoinGecko market identifiers to ccxt exchange ids.  CoinGecko still
+# uses legacy identifiers like ``mxc`` for MEXC; normalising ensures those
+# exchanges appear in the available list.
+EXCHANGE_ALIASES = {
+    "mxc": "mexc",
+    "gate-io": "gate",
+    "gateio": "gate",
+}
+
+
+def _normalize_exchange_id(exchange_id: str) -> str:
+    """Normalise CoinGecko market identifiers for ccxt."""
+
+    return EXCHANGE_ALIASES.get(exchange_id.lower(), exchange_id.lower())
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -115,26 +147,34 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
-    supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
-    exchanges = sorted({ex for ex, _ in supported_markets})
+    normalized_markets = [(_normalize_exchange_id(ex), pair) for ex, pair in markets]
+    supported_markets = [m for m in normalized_markets if m[0] in ccxt.exchanges]
+    supported_exchanges = sorted({ex for ex, _ in supported_markets})
 
-    if exchange is None and exchanges:
-        if len(exchanges) > 1:
+    if exchange is None and supported_exchanges:
+        if len(supported_exchanges) > 1:
             print(f"Available exchanges for {ticker}:")
-            for idx, ex in enumerate(exchanges, start=1):
+            for idx, ex in enumerate(supported_exchanges, start=1):
                 print(f"{idx}. {ex}")
             while True:
-                choice = input(f"Select exchange [1-{len(exchanges)}]: ")
+                choice = input(f"Select exchange [1-{len(supported_exchanges)}]: ")
                 try:
                     idx = int(choice)
-                    if 1 <= idx <= len(exchanges):
-                        exchange = exchanges[idx - 1]
+                    if 1 <= idx <= len(supported_exchanges):
+                        exchange = supported_exchanges[idx - 1]
                         break
                 except ValueError:
                     pass
                 print("Invalid selection. Please try again.")
         else:
-            exchange = exchanges[0]
+            exchange = supported_exchanges[0]
+
+    # Notify about markets that cannot be fetched via ccxt.
+    unsupported = sorted(
+        {ex for ex, _ in markets if _normalize_exchange_id(ex) not in ccxt.exchanges}
+    )
+    if unsupported:
+        logger.info("Unsupported exchanges: %s", ", ".join(unsupported))
 
     if exchange and exchange not in ccxt.exchanges:
         raise ValueError(f"Exchange {exchange} not supported by ccxt")
@@ -173,6 +213,24 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
                 return all_data[-DAYS_LIMIT:]
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, exchange_name, exc)
+            # Some exchanges (e.g. gate) reject old start dates. Retry once
+            # without a ``since`` parameter and trim to the desired window.
+            try:
+                batch = exchange_class.fetch_ohlcv(
+                    symbol, timeframe=timeframe, limit=DAYS_LIMIT
+                )
+                if batch:
+                    logger.info(
+                        "Fetched %d rows from %s %s", len(batch), exchange_name, symbol
+                    )
+                    return batch[-DAYS_LIMIT:]
+            except Exception as exc2:
+                logger.warning(
+                    "Retry without since failed for %s on %s: %s",
+                    symbol,
+                    exchange_name,
+                    exc2,
+                )
             continue
 
     # Try common trading pairs on selected or all exchanges before using CoinGecko
@@ -227,7 +285,7 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> List[List[float]]:
     try:
         resp = requests.get(
             f"{COINGECKO_API}/coins/{coin_id}/ohlc",
-            params={"vs_currency": "usd", "days": DAYS_LIMIT},
+            params={"vs_currency": "usd", "days": _coingecko_days(DAYS_LIMIT)},
             timeout=30,
         )
         resp.raise_for_status()

@@ -105,7 +105,9 @@ def main() -> None:
 
         try:
             final_price = float(input("Final desired price for liquidation: "))
-            q_pct = float(input("Increase in sell rate q percentage: "))
+            q_pct = float(
+                input("Increase in sell buy rate q percentage: ")
+            )
             step_input = input(
                 "Price step percentage for schedule (default 5): "
             ).strip()
