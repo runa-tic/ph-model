@@ -42,6 +42,8 @@ EXCHANGE_ALIASES = {
     "mxc": "mexc",
     "gate-io": "gate",
     "gateio": "gate",
+    "bybit_spot": "bybit",
+    "bybit-spot": "bybit",
 }
 
 
