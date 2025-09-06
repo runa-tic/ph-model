@@ -51,6 +51,15 @@ crypto-fetch [ticker]
 
 If `ticker` is omitted, you will be prompted to enter it interactively.
 
+When launched, the tool shows a brief banner:
+
+```
+Paper Hands Model [Version 1.0]
+© Bitmaker L.L.C-FZ. All rights reserved.
+```
+
+Prompts are highlighted to provide a friendlier interface.
+
 Example:
 
 ```bash
