@@ -58,7 +58,6 @@ EXCHANGE_ALIASES = {
     "p2pb2b": "p2b",
 }
 
-
 # Quote currencies considered "dollar" variations. Only markets using one of
 # these as the quote currency will be fetched. This avoids cross pairs such as
 # ``LTC/BTC`` or fiat pairs like ``BTC/JPY``.
@@ -206,23 +205,15 @@ def fetch_ohlcv(
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
-    supported_markets = [
-        m for m in markets if m[0] in ccxt.exchanges and m[0] not in EXCHANGE_BLACKLIST
-    ]
+    supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
     markets_by_exchange: Dict[str, List[str]] = {}
     for ex, pair in supported_markets:
         markets_by_exchange.setdefault(ex, []).append(pair)
 
     collected: List[str] = warnings if warnings is not None else []
 
-    # Record markets that cannot be fetched via ccxt or are blacklisted.
-    unsupported = sorted(
-        {
-            ex
-            for ex, _ in markets
-            if ex not in ccxt.exchanges or ex in EXCHANGE_BLACKLIST
-        }
-    )
+    # Record markets that cannot be fetched via ccxt.
+    unsupported = sorted({ex for ex, _ in markets if ex not in ccxt.exchanges})
     if unsupported:
         collected.append("Unsupported exchanges: " + ", ".join(unsupported))
 
