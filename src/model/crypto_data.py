@@ -12,7 +12,6 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
-from tqdm import tqdm
 
 try:
     from tqdm import tqdm
@@ -79,7 +78,7 @@ EXCHANGE_ALIASES = {
     "okex": "okx",
     "crypto_com": "cryptocom",
     "hashkey_exchange": "hashkey",
-    "huobi": "htx",
+    "huobi": "huobi",
     "p2pb2b": "p2b",
 }
 
@@ -106,7 +105,7 @@ ALLOWED_QUOTES = {
 
 # Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
 # unsupported to avoid noisy warnings during normal operation.
-EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
+EXCHANGE_BLACKLIST = {"lbank", "phemex", "latoken"}
 
 # Quote currencies considered "dollar" variations. Only markets using one of
 # these as the quote currency will be fetched. This avoids cross pairs such as
@@ -126,7 +125,7 @@ ALLOWED_QUOTES = {
 
 # Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
 # unsupported to avoid noisy warnings during normal operation.
-EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
+EXCHANGE_BLACKLIST = {"lbank", "phemex", "latoken"}
 
 
 def _normalize_exchange_id(exchange_id: str) -> str:
