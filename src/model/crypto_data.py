@@ -205,6 +205,14 @@ def fetch_ohlcv(
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
+    # Display all exchanges reported by CoinGecko so users can verify which
+    # markets will be attempted.
+    discovered = sorted({ex for ex, _ in markets})
+    if discovered:
+        print("Available exchanges:", ", ".join(discovered))
+    else:
+        print("No exchanges reported on CoinGecko")
+
     supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
     markets_by_exchange: Dict[str, List[str]] = {}
     for ex, pair in supported_markets:
