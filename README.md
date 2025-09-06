@@ -88,6 +88,27 @@ pyinstaller --name crypto-fetch --onefile src/model/cli.py --paths src
 
 The compiled binary will be available in the `dist/` directory.
 
+### Run from Finder on macOS
+
+If you want to launch the binary by double-clicking in Finder, create a small
+wrapper script in the project root:
+
+```bash
+#!/bin/bash
+cd "$(dirname "$0")/dist"
+./crypto-fetch "$@"
+read -p "Press Enter to close..."
+```
+
+Save this as `crypto-fetch.command` and make it executable:
+
+```bash
+chmod +x crypto-fetch.command
+```
+
+Double-clicking `crypto-fetch.command` opens Terminal, runs the compiled
+binary, and keeps the window open until you press Enter.
+
 ## Buyback model
 
 The buyback schedule models how many tokens are repurchased to reach a desired
