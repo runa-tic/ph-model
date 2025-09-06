@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import logging
 import math
+import sys
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Dict, List, Tuple
@@ -11,6 +12,12 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
+
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
 
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
@@ -44,13 +51,26 @@ EXCHANGE_ALIASES = {
     "gateio": "gate",
     "bybit_spot": "bybit",
     "bybit-spot": "bybit",
+    "okex": "okx",
 }
+
+# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
+# unsupported to avoid noisy warnings during normal operation.
+EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
 
 
 def _normalize_exchange_id(exchange_id: str) -> str:
     """Normalise CoinGecko market identifiers for ccxt."""
 
     return EXCHANGE_ALIASES.get(exchange_id.lower(), exchange_id.lower())
+
+
+def _normalize_pair(exchange_id: str, pair: str) -> str:
+    """Normalize trading pairs for specific exchanges."""
+
+    if exchange_id == "kraken":
+        return pair.replace("XBT", "BTC")
+    return pair
 
 
 logger = logging.getLogger(__name__)
@@ -135,32 +155,41 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
     for entry in data.get("tickers", []):
         exchange_id = entry["market"]["identifier"]
         pair = f"{entry['base']}/{entry['target']}"
+        exchange_id = _normalize_exchange_id(exchange_id)
+        pair = _normalize_pair(exchange_id, pair)
         markets.append((exchange_id, pair))
     return markets
 
 
-def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List[float]]]:
+def fetch_ohlcv(
+    ticker: str, exchange: str | None = None, progress: bool = False
+) -> Tuple[Dict[str, List[List[float]]], List[str]]:
     """Fetch up to the last ``DAYS_LIMIT`` days of OHLCV data.
 
     When ``exchange`` is ``None`` data is fetched from *all* ccxt-supported
-    exchanges reported by CoinGecko. Results are returned in a dictionary
-    mapping exchange id to OHLCV rows. If no exchange yields data, the
-    function falls back to CoinGecko's OHLC endpoint with the key
-    ``"coingecko"``.
+    exchanges reported by CoinGecko. Returns a tuple ``(results, failures)``
+    where ``results`` maps exchange ids to OHLCV rows and ``failures`` lists
+    exchanges that yielded no data. If every exchange fails, the function
+    falls back to CoinGecko's OHLC endpoint with the key ``"coingecko"``.
+
+    Set ``progress=True`` to show a progress bar while iterating over exchanges.
     """
 
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
-    normalized_markets = [(_normalize_exchange_id(ex), pair) for ex, pair in markets]
-    supported_markets = [m for m in normalized_markets if m[0] in ccxt.exchanges]
+    supported_markets = [m for m in markets if m[0] in ccxt.exchanges and m[0] not in EXCHANGE_BLACKLIST]
     markets_by_exchange: Dict[str, List[str]] = {}
     for ex, pair in supported_markets:
         markets_by_exchange.setdefault(ex, []).append(pair)
 
-    # Notify about markets that cannot be fetched via ccxt.
+    # Notify about markets that cannot be fetched via ccxt or are blacklisted.
     unsupported = sorted(
-        {ex for ex, _ in markets if _normalize_exchange_id(ex) not in ccxt.exchanges}
+        {
+            ex
+            for ex, _ in markets
+            if ex not in ccxt.exchanges or ex in EXCHANGE_BLACKLIST
+        }
     )
     if unsupported:
         logger.info("Unsupported exchanges: %s", ", ".join(unsupported))
@@ -194,7 +223,9 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                     break
                 since = batch[-1][0] + MS_IN_DAY
             if all_data:
-                logger.info("Fetched %d rows from %s %s", len(all_data), ex_name, symbol)
+                logger.debug(
+                    "Fetched %d rows from %s %s", len(all_data), ex_name, symbol
+                )
                 return all_data[-DAYS_LIMIT:]
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, ex_name, exc)
@@ -203,7 +234,9 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                     symbol, timeframe=timeframe, limit=DAYS_LIMIT
                 )
                 if batch:
-                    logger.info("Fetched %d rows from %s %s", len(batch), ex_name, symbol)
+                    logger.debug(
+                        "Fetched %d rows from %s %s", len(batch), ex_name, symbol
+                    )
                     return batch[-DAYS_LIMIT:]
             except Exception as exc2:
                 logger.warning(
@@ -215,7 +248,12 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
         return []
 
     # First try explicit markets reported by CoinGecko
-    for ex_name in exchanges_to_try:
+    iterator = tqdm(
+        exchanges_to_try,
+        desc="Fetching OHLCV",
+        disable=not progress or not sys.stdout.isatty(),
+    )
+    for ex_name in iterator:
         for symbol in markets_by_exchange.get(ex_name, []):
             data = _fetch_from_exchange(ex_name, symbol)
             if data:
@@ -247,8 +285,9 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                 results[ex_name] = data
                 break
 
+    failures = [ex for ex in exchanges_to_try if ex not in results]
     if results:
-        return results
+        return results, failures
 
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
@@ -272,7 +311,7 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
     data = data[-DAYS_LIMIT:]
 
     # CoinGecko's OHLC endpoint does not provide volume; set it to 0.0
-    return {"coingecko": [row + [0.0] for row in data]}
+    return {"coingecko": [row + [0.0] for row in data]}, failures
 
 
 def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]]) -> None:
