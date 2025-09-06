@@ -46,13 +46,15 @@ paper-hands token buybacks.
 ## Usage
 
 ```bash
-python -m model.cli <ticker>
+crypto-fetch [ticker]
 ```
+
+If `ticker` is omitted, you will be prompted to enter it interactively.
 
 Example:
 
 ```bash
-python -m model.cli btc
+crypto-fetch btc
 ```
 
 Running the command performs the following steps:
@@ -73,6 +75,18 @@ Running the command performs the following steps:
    `<TICKER>_buyback.png`.
 
 Use the `--debug` flag to print detailed logging while the tool runs.
+
+### Build a standalone binary
+
+To distribute the CLI as a single executable (so end users do not need Python installed),
+bundle it with [PyInstaller](https://pyinstaller.org/):
+
+```bash
+pip install pyinstaller
+pyinstaller --name crypto-fetch --onefile src/model/cli.py --paths src
+```
+
+The compiled binary will be available in the `dist/` directory.
 
 ## Buyback model
 
