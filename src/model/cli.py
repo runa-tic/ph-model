@@ -4,7 +4,17 @@ from __future__ import annotations
 import argparse
 import logging
 
-from colorama import Fore, Style, init
+try:
+    from colorama import Fore, Style, init
+except ModuleNotFoundError:  # pragma: no cover - fallback when colorama isn't bundled
+    class _NoColor:
+        def __getattr__(self, name: str) -> str:
+            return ""
+
+    Fore = Style = _NoColor()
+
+    def init(*_args, **_kwargs):  # type: ignore
+        pass
 
 from model.crypto_data import (
     fetch_coin_info,
@@ -15,6 +25,33 @@ from model.crypto_data import (
     save_surge_snippets,
     save_liquidation_model,
     save_to_csv,
+)
+
+
+ASCII_ART = (
+    "                :::::::\n"
+    "             :============:\n"
+    "           ::=============::\n"
+    "          :-===========:=+++::              :::::::::::                                                    :::\n"
+    "        ::-===========:++++++-:             ::::::::::::    :::    ::                                      :::\n"
+    "     :: ::-========::++++++++-:             :::      ::::          ::                                      :::\n"
+    "         :-=======:=+++++++++-:             :::       :::   :::  :::::::  :: ::::  ::::::       :::::::    :::     :::  "
+    "  ::::::     ::: :::\n"
+    "      :: ::-===::+++++++++++::              ::::::::::::    :::    ::     ::::  :::::  ::::  :::::   ::::  :::  ::::   :"
+    ":::   :::::  ::::\n"
+    "     ::   :-==:=++++++++++++::              :::::::::::::   :::    ::     ::     :::    :::           :::  ::: :::     :"
+    "::      :::  :::\n"
+    "::      :    :++++++++++++:                 :::        :::  :::    ::     ::     :::    :::    :::::: :::  ::::::      :"
+    ":::::::::::  :::\n"
+    "    ::     :: :::++++++:::                  :::       ::::  :::    ::     ::     :::    :::  ::::    ::::  ::: :::::   :"
+    ":::    ::::  :::\n"
+    "      ::      ::    ::                      :::::::::::::   :::    :::::  ::     :::    :::    ::::::::::  :::   ::::   "
+    ":::::::::    :::\n"
+    "::        ::    :: ::                       ::::::::::::    :::     ::::  ::     :::    :::     ::::: :::  :::     :::  "
+    "  ::::::     :::\n"
+    "     ::  ::     ::\n"
+    "             :::\n"
+    "          ::\n"
 )
 
 
@@ -32,6 +69,7 @@ def main() -> None:
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
+    print(Fore.CYAN + ASCII_ART)
     print(Fore.CYAN + "Paper Hands Model [Version 1.0]")
     print(Fore.CYAN + "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.")
     print()

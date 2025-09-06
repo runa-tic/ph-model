@@ -51,14 +51,15 @@ crypto-fetch [ticker]
 
 If `ticker` is omitted, you will be prompted to enter it interactively.
 
-When launched, the tool shows a brief banner:
+When launched, the tool displays an ASCII art banner followed by:
 
 ```
 Paper Hands Model [Version 1.0]
 © Bitmaker L.L.C-FZ. All rights reserved.
 ```
 
-Prompts are highlighted to provide a friendlier interface.
+If `colorama` is available, prompts are highlighted to provide a friendlier
+interface, but the CLI also runs without it for standalone builds.
 
 Example:
 
