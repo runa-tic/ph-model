@@ -8,6 +8,8 @@ paper-hands token buybacks.
 - Fetch current USD price and circulating supply from CoinGecko.
 - Retrieve up to the last 364 days of daily OHLCV candles from an exchange via
   [ccxt](https://github.com/ccxt/ccxt) with automatic fallbacks to CoinGecko.
+- Normalise exchange identifiers from CoinGecko to ccxt (for example, `okex`
+  is mapped to `okx`) so OKX markets are supported out of the box.
 - Detect days where the intraday high is at least 75% above the open price and
   export five-day "surge snippets" that include `ph_volume` and `ph_percentage`
   metrics.
