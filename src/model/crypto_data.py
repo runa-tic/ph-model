@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import logging
 import math
+import sys
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Dict, List, Tuple
@@ -11,6 +12,7 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
+from tqdm import tqdm
 
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
@@ -47,11 +49,23 @@ EXCHANGE_ALIASES = {
     "okex": "okx",
 }
 
+# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
+# unsupported to avoid noisy warnings during normal operation.
+EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
+
 
 def _normalize_exchange_id(exchange_id: str) -> str:
     """Normalise CoinGecko market identifiers for ccxt."""
 
     return EXCHANGE_ALIASES.get(exchange_id.lower(), exchange_id.lower())
+
+
+def _normalize_pair(exchange_id: str, pair: str) -> str:
+    """Normalize trading pairs for specific exchanges."""
+
+    if exchange_id == "kraken":
+        return pair.replace("XBT", "BTC")
+    return pair
 
 
 logger = logging.getLogger(__name__)
@@ -136,12 +150,14 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
     for entry in data.get("tickers", []):
         exchange_id = entry["market"]["identifier"]
         pair = f"{entry['base']}/{entry['target']}"
+        exchange_id = _normalize_exchange_id(exchange_id)
+        pair = _normalize_pair(exchange_id, pair)
         markets.append((exchange_id, pair))
     return markets
 
 
 def fetch_ohlcv(
-    ticker: str, exchange: str | None = None
+    ticker: str, exchange: str | None = None, progress: bool = False
 ) -> Tuple[Dict[str, List[List[float]]], List[str]]:
     """Fetch up to the last ``DAYS_LIMIT`` days of OHLCV data.
 
@@ -150,20 +166,25 @@ def fetch_ohlcv(
     where ``results`` maps exchange ids to OHLCV rows and ``failures`` lists
     exchanges that yielded no data. If every exchange fails, the function
     falls back to CoinGecko's OHLC endpoint with the key ``"coingecko"``.
+
+    Set ``progress=True`` to show a progress bar while iterating over exchanges.
     """
 
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
-    normalized_markets = [(_normalize_exchange_id(ex), pair) for ex, pair in markets]
-    supported_markets = [m for m in normalized_markets if m[0] in ccxt.exchanges]
+    supported_markets = [m for m in markets if m[0] in ccxt.exchanges and m[0] not in EXCHANGE_BLACKLIST]
     markets_by_exchange: Dict[str, List[str]] = {}
     for ex, pair in supported_markets:
         markets_by_exchange.setdefault(ex, []).append(pair)
 
-    # Notify about markets that cannot be fetched via ccxt.
+    # Notify about markets that cannot be fetched via ccxt or are blacklisted.
     unsupported = sorted(
-        {ex for ex, _ in markets if _normalize_exchange_id(ex) not in ccxt.exchanges}
+        {
+            ex
+            for ex, _ in markets
+            if ex not in ccxt.exchanges or ex in EXCHANGE_BLACKLIST
+        }
     )
     if unsupported:
         logger.info("Unsupported exchanges: %s", ", ".join(unsupported))
@@ -222,7 +243,12 @@ def fetch_ohlcv(
         return []
 
     # First try explicit markets reported by CoinGecko
-    for ex_name in exchanges_to_try:
+    iterator = tqdm(
+        exchanges_to_try,
+        desc="Fetching OHLCV",
+        disable=not progress or not sys.stdout.isatty(),
+    )
+    for ex_name in iterator:
         for symbol in markets_by_exchange.get(ex_name, []):
             data = _fetch_from_exchange(ex_name, symbol)
             if data:

@@ -1,4 +1,4 @@
-from model.crypto_data import _coingecko_days, _normalize_exchange_id
+from model.crypto_data import _coingecko_days, _normalize_exchange_id, _normalize_pair
 
 
 def test_coingecko_days_rounding():
@@ -11,3 +11,8 @@ def test_exchange_normalization():
     assert _normalize_exchange_id('gate') == 'gate'
     assert _normalize_exchange_id('bybit_spot') == 'bybit'
     assert _normalize_exchange_id('okex') == 'okx'
+
+
+def test_pair_normalization():
+    assert _normalize_pair('kraken', 'XBT/EUR') == 'BTC/EUR'
+    assert _normalize_pair('binance', 'BTC/USDT') == 'BTC/USDT'

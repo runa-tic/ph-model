@@ -100,7 +100,7 @@ def main() -> None:
 
     try:
         info = fetch_coin_info(ticker)
-        ohlcv_map, failures = fetch_ohlcv(ticker)
+        ohlcv_map, failures = fetch_ohlcv(ticker, progress=True)
     except ValueError as exc:
         print(exc)
         return

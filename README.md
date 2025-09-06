@@ -10,6 +10,7 @@ paper-hands token buybacks.
   [ccxt](https://github.com/ccxt/ccxt) with automatic fallbacks to CoinGecko.
 - Normalise exchange identifiers from CoinGecko to ccxt (for example, `okex`
   is mapped to `okx`) so OKX markets are supported out of the box.
+- Display a progress bar while downloading OHLCV data across exchanges.
 - Detect days where the intraday high is at least 75% above the open price and
   export five-day "surge snippets" that include `ph_volume` and `ph_percentage`
   metrics.

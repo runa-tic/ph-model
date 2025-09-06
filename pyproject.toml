@@ -9,6 +9,7 @@ dependencies = [
     "requests",
     "matplotlib",
     "colorama",
+    "tqdm",
 ]
 
 [project.scripts]
