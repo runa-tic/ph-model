@@ -26,6 +26,12 @@ except Exception:  # pragma: no cover - fallback when tqdm is missing
     def tqdm(iterable, **_):
         return iterable
 
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
+
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
 
@@ -59,6 +65,26 @@ EXCHANGE_ALIASES = {
     "bybit_spot": "bybit",
     "bybit-spot": "bybit",
     "okex": "okx",
+}
+
+# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
+# unsupported to avoid noisy warnings during normal operation.
+EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
+
+# Quote currencies considered "dollar" variations. Only markets using one of
+# these as the quote currency will be fetched. This avoids cross pairs such as
+# ``LTC/BTC`` or fiat pairs like ``BTC/JPY``.
+ALLOWED_QUOTES = {
+    "USD",
+    "USDT",
+    "USDC",
+    "BUSD",
+    "DAI",
+    "TUSD",
+    "USDD",
+    "USDP",
+    "PAX",
+    "GUSD",
 }
 
 # Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
@@ -159,9 +185,14 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
         ) from exc
     data = resp.json()
     markets: List[Tuple[str, str]] = []
+    base_upper = ticker.upper()
     for entry in data.get("tickers", []):
+        base = entry["base"].upper()
+        quote = entry["target"].upper()
+        if base != base_upper or quote not in ALLOWED_QUOTES:
+            continue
         exchange_id = entry["market"]["identifier"]
-        pair = f"{entry['base']}/{entry['target']}"
+        pair = f"{base}/{quote}"
         exchange_id = _normalize_exchange_id(exchange_id)
         pair = _normalize_pair(exchange_id, pair)
         markets.append((exchange_id, pair))
@@ -220,6 +251,36 @@ def fetch_ohlcv(
     now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
     since_start = now_ms - DAYS_LIMIT * MS_IN_DAY
 
+    def _trades_to_ohlcv(trades: List[Dict], duration: int) -> List[List[float]]:
+        buckets: Dict[int, List[float]] = {}
+        for t in trades:
+            ts = int(math.floor(t["timestamp"] / duration) * duration)
+            price = t["price"]
+            amount = t["amount"]
+            ohlcv = buckets.setdefault(
+                ts, [ts, price, price, price, price, 0.0]
+            )
+            ohlcv[2] = max(ohlcv[2], price)
+            ohlcv[3] = min(ohlcv[3], price)
+            ohlcv[4] = price
+            ohlcv[5] += amount
+        return [buckets[k] for k in sorted(buckets)]
+
+    def _build_from_trades(ex, symbol: str, since: int) -> List[List[float]]:
+        timeframe = "1d"
+        duration = ex.parse_timeframe(timeframe) * 1000
+        all_data: List[List[float]] = []
+        start = since
+        while start < now_ms and len(all_data) < DAYS_LIMIT:
+            trades = ex.fetch_trades(symbol, since=start, limit=1000)
+            if not trades:
+                start += duration
+                continue
+            ohlcv = _trades_to_ohlcv(trades, duration)
+            all_data.extend(ohlcv)
+            start = trades[-1]["timestamp"] + 1
+        return all_data[-DAYS_LIMIT:]
+
     def _fetch_from_exchange(ex_name: str, symbol: str) -> List[List[float]]:
         exchange_class = getattr(ccxt, ex_name)({"enableRateLimit": True})
         timeframe = "1d"
@@ -256,7 +317,13 @@ def fetch_ohlcv(
                     )
                     return batch[-DAYS_LIMIT:]
             except Exception as exc2:
-                collected.append(f"Failed to fetch {symbol} on {ex_name}: {exc2}")
+                logger.debug("Fetching without since failed for %s on %s: %s", symbol, ex_name, exc2)
+                try:
+                    return _build_from_trades(exchange_class, symbol, since_start)
+                except Exception as exc3:
+                    collected.append(
+                        f"Failed to fetch {symbol} on {ex_name}: {exc3}"
+                    )
         return []
 
     # First try explicit markets reported by CoinGecko
@@ -274,11 +341,7 @@ def fetch_ohlcv(
 
     # Try common trading pairs on exchanges that still lack data
     base_symbol = ticker.upper()
-    generic_pairs = [
-        f"{base_symbol}/USDT",
-        f"{base_symbol}/USD",
-        f"{base_symbol}/BTC",
-    ]
+    generic_pairs = [f"{base_symbol}/{q}" for q in ("USDT", "USD", "USDC")]
 
     for ex_name in exchanges_to_try:
         if ex_name in results:
