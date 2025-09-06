@@ -12,6 +12,7 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
+from tqdm import tqdm
 
 try:
     from tqdm import tqdm
