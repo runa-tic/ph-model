@@ -12,6 +12,13 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
+from tqdm import tqdm
+
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
 
 try:
     from tqdm import tqdm
