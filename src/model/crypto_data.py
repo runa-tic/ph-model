@@ -12,6 +12,25 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
+from tqdm import tqdm
+
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
+
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
+
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
 
 try:
     from tqdm import tqdm
@@ -73,6 +92,10 @@ ALLOWED_QUOTES = {
     "PAX",
     "GUSD",
 }
+
+# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
+# unsupported to avoid noisy warnings during normal operation.
+EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
 
 
 def _normalize_exchange_id(exchange_id: str) -> str:
