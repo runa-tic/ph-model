@@ -67,6 +67,8 @@ Example:
 crypto-fetch btc
 ```
 
+All generated CSV and PNG files are stored in `dist/datasets/`.
+
 Running the command performs the following steps:
 
 1. Fetch matching coins from CoinGecko and prompt you to choose the correct one
@@ -75,14 +77,14 @@ Running the command performs the following steps:
    are available.
 3. Download up to 364 days of OHLCV data from the chosen exchange or, if
    exchanges fail, from CoinGecko.
-4. Write `<TICKER>_data.csv` containing the current price, circulating supply
-   and OHLCV history.
-5. Generate `<TICKER>_surges.csv` with five-day windows around every surge where
+4. Write `dist/datasets/<TICKER>_data.csv` containing the current price,
+   circulating supply and OHLCV history.
+5. Generate `dist/datasets/<TICKER>_surges.csv` with five-day windows around
    `high / open >= 1.75`, including `ph_volume` and `ph_percentage` columns, and
    print the average paper-hands percentage.
 6. Prompt for a final buyback price and a percentage `q` increase in sell rate,
-   then create `<TICKER>_buyback.csv` together with a chart
-   `<TICKER>_buyback.png`.
+   then create `dist/datasets/<TICKER>_buyback.csv` together with a chart
+   `dist/datasets/<TICKER>_buyback.png`.
 
 Use the `--debug` flag to print detailed logging while the tool runs.
 

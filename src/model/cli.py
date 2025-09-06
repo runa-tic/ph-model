@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import argparse
 import logging
-import random
 import sys
-import time
+from pathlib import Path
 
 try:
     from colorama import Fore, Style, init
@@ -110,11 +109,18 @@ def main() -> None:
         print("No OHLCV data available")
         return
 
+    if getattr(sys, "frozen", False):
+        dist_dir = Path(sys.executable).resolve().parent
+    else:
+        dist_dir = Path(__file__).resolve().parent.parent.parent / "dist"
+    datasets_dir = dist_dir / "datasets"
+    datasets_dir.mkdir(parents=True, exist_ok=True)
+
     base = args.output or ticker.upper()
-    if base.lower().endswith('.csv'):
+    if base.lower().endswith(".csv"):
         base = base[:-4]
     for ex, data in ohlcv_map.items():
-        filename = f"{base}_{ex}_data.csv"
+        filename = datasets_dir / f"{base}_{ex}_data.csv"
         save_to_csv(filename, info, data)
         print(f"Data written to {filename}")
 
@@ -131,7 +137,7 @@ def main() -> None:
         surge_pct = abs(surge_pct)
         avgs = []
         for ex, data in ohlcv_map.items():
-            surge_filename = f"{base}_{ex}_surges.csv"
+            surge_filename = datasets_dir / f"{base}_{ex}_surges.csv"
             avg = save_surge_snippets(
                 surge_filename,
                 data,
@@ -154,7 +160,7 @@ def main() -> None:
         except ValueError:
             print("Invalid numeric input")
             return
-        buyback_filename = f"{base}_buyback.csv"
+        buyback_filename = datasets_dir / f"{base}_buyback.csv"
         save_buyback_model(
             buyback_filename,
             info["price"],
@@ -165,7 +171,7 @@ def main() -> None:
             step_pct,
         )
         print(f"Buyback model written to {buyback_filename}")
-        chart_file = buyback_filename.replace(".csv", ".png")
+        chart_file = datasets_dir / f"{base}_buyback.png"
         plot_buyback_chart(buyback_filename, chart_file)
         print(f"Buyback chart written to {chart_file}")
     elif mode.startswith("l"):
@@ -180,7 +186,7 @@ def main() -> None:
         selloff_pct = -abs(selloff_pct)
         avgs = []
         for ex, data in ohlcv_map.items():
-            selloff_filename = f"{base}_{ex}_selloffs.csv"
+            selloff_filename = datasets_dir / f"{base}_{ex}_selloffs.csv"
             avg = save_selloff_snippets(
                 selloff_filename,
                 data,
@@ -205,7 +211,7 @@ def main() -> None:
         except ValueError:
             print("Invalid numeric input")
             return
-        liquidation_filename = f"{base}_liquidation.csv"
+        liquidation_filename = datasets_dir / f"{base}_liquidation.csv"
         save_liquidation_model(
             liquidation_filename,
             info["price"],
