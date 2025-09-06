@@ -11,6 +11,10 @@ def test_exchange_normalization():
     assert _normalize_exchange_id('gate') == 'gate'
     assert _normalize_exchange_id('bybit_spot') == 'bybit'
     assert _normalize_exchange_id('okex') == 'okx'
+    assert _normalize_exchange_id('crypto_com') == 'cryptocom'
+    assert _normalize_exchange_id('hashkey_exchange') == 'hashkey'
+    assert _normalize_exchange_id('huobi') == 'htx'
+    assert _normalize_exchange_id('p2pb2b') == 'p2b'
 
 
 def test_pair_normalization():

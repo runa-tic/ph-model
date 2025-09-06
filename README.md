@@ -8,8 +8,9 @@ paper-hands token buybacks.
 - Fetch current USD price and circulating supply from CoinGecko.
 - Retrieve up to the last 364 days of daily OHLCV candles from an exchange via
   [ccxt](https://github.com/ccxt/ccxt) with automatic fallbacks to CoinGecko.
-- Normalise exchange identifiers from CoinGecko to ccxt (for example, `okex`
-  is mapped to `okx`) so OKX markets are supported out of the box.
+- Normalise exchange identifiers from CoinGecko to ccxt (e.g. `okex` → `okx`,
+  `crypto_com` → `cryptocom`, `huobi` → `htx`, `p2pb2b` → `p2b`) so these
+  markets are supported out of the box.
 - Display a progress bar while downloading OHLCV data across exchanges (falls back to plain output when `tqdm` isn't installed).
 - Restrict markets to USD and USD-pegged quote currencies (e.g. USDT, USDC) to
   avoid non-dollar or cross pairs such as `BTC/JPY` or `LTC/BTC`.

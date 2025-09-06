@@ -38,6 +38,12 @@ except Exception:  # pragma: no cover - fallback when tqdm is missing
     def tqdm(iterable, **_):
         return iterable
 
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
+
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
 
@@ -71,6 +77,31 @@ EXCHANGE_ALIASES = {
     "bybit_spot": "bybit",
     "bybit-spot": "bybit",
     "okex": "okx",
+    "crypto_com": "cryptocom",
+    "hashkey_exchange": "hashkey",
+    "huobi": "htx",
+    "p2pb2b": "p2b",
+}
+
+# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
+# unsupported to avoid noisy warnings during normal operation. Currently empty
+# so all exchanges are attempted.
+EXCHANGE_BLACKLIST: set[str] = set()
+
+# Quote currencies considered "dollar" variations. Only markets using one of
+# these as the quote currency will be fetched. This avoids cross pairs such as
+# ``LTC/BTC`` or fiat pairs like ``BTC/JPY``.
+ALLOWED_QUOTES = {
+    "USD",
+    "USDT",
+    "USDC",
+    "BUSD",
+    "DAI",
+    "TUSD",
+    "USDD",
+    "USDP",
+    "PAX",
+    "GUSD",
 }
 
 # Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
