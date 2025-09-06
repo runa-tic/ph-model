@@ -32,39 +32,20 @@ from model.crypto_data import (
 
 
 BASE_ART = """
-                                 .............               
-                            .....:::::::::::::.....          
-                           ......-------------.....          
-                         ...-----------------------...       
-                      ...:-------------------------.....     
-                    ...::------------------------:::::::...  
-                    ...-------------------------:..=====...  
-                    ...-----------------------..-=======...  
-               .....:----------------------:..============:..
-               .....:--------------------:::::============:..
-                 ...:--------------------..-==============:..
-          ...  .....:-----------------:..=================:..
-          ...  .....:---------------::---=================:..
-                 ...:---------------..-===================:..
-     ...         ...:------------..:======================:..
-            .... ......-------:..=======================...  
-          ...... ......-----:::--=======================...  
-          ...       ...-----..:=========================...  
-                 .... ......=========================:..     
-...            ...       ...=======================...       
-...     ..     ...     .....-----=============-----...       
-       ....           .... ......=============.....          
-     ...            ...       ................               
-     ...    ....    ...     ..................               
-            ....           ....       ......                 
-...                 ...          ...  ...                    
-            ....         ...                                 
-          ......  ...    ...     ...                         
-          ...    ....            ...                         
-                            ...                               
-                         ...                                 
-                    ...  ...                                 
-                    ...                                      
+            ..........    
+           .----------.   
+         .----------:.==. 
+      ...:---------:-===:. 
+       ..--------.:======.
+       ..------.=========.
+  .  ....:---.-=========:.
+    ..  ..--:==========-. 
+.     ..   .==========.   
+  .      .   .......      
+.    ..  .  . . ...       
+     ..    .              
+            .             
+         . .              
 """
 
 VARIANTS = ".:=-"
@@ -72,6 +53,11 @@ VARIANTS = ".:=-"
 
 def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
     lines = BASE_ART.splitlines()
+    footer = [
+        "Paper Hands Model [Version 1.0]",
+        "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.",
+        "",
+    ]
     for _ in range(frames):
         print("\033[H\033[2J", end="")
         for line in lines:
@@ -79,10 +65,16 @@ def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
                 random.choice(VARIANTS) if ch != " " else " " for ch in line
             )
             print(Fore.CYAN + animated)
+        for line in footer:
+            print(Fore.CYAN + line)
         sys.stdout.flush()
         time.sleep(delay)
     print("\033[H\033[2J", end="")
-    print(Fore.CYAN + BASE_ART)
+    for line in lines:
+        print(Fore.CYAN + line)
+    for line in footer:
+        print(Fore.CYAN + line)
+    print()
 
 
 def main() -> None:
@@ -100,9 +92,6 @@ def main() -> None:
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
     animate_banner()
-    print(Fore.CYAN + "Paper Hands Model [Version 1.0]")
-    print(Fore.CYAN + "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.")
-    print()
 
     ticker = args.ticker or prompt("Enter token ticker: ").strip()
 
