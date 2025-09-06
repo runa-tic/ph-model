@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import random
+import sys
+import time
 
 try:
     from colorama import Fore, Style, init
@@ -26,6 +29,52 @@ from model.crypto_data import (
     save_liquidation_model,
     save_to_csv,
 )
+
+
+BASE_ART = """
+            ..........    
+           .----------.   
+         .----------:.==. 
+      ...:---------:-===:. 
+       ..--------.:======.
+       ..------.=========.
+  .  ....:---.-=========:.
+    ..  ..--:==========-. 
+.     ..   .==========.   
+  .      .   .......      
+.    ..  .  . . ...       
+     ..    .              
+            .             
+         . .              
+"""
+
+VARIANTS = ".:=-"
+
+
+def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
+    lines = BASE_ART.splitlines()
+    footer = [
+        "Paper Hands Model [Version 1.0]",
+        "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.",
+        "",
+    ]
+    for _ in range(frames):
+        print("\033[H\033[2J", end="")
+        for line in lines:
+            animated = "".join(
+                random.choice(VARIANTS) if ch != " " else " " for ch in line
+            )
+            print(Fore.CYAN + animated)
+        for line in footer:
+            print(Fore.CYAN + line)
+        sys.stdout.flush()
+        time.sleep(delay)
+    print("\033[H\033[2J", end="")
+    for line in lines:
+        print(Fore.CYAN + line)
+    for line in footer:
+        print(Fore.CYAN + line)
+    print()
 
 
 def main() -> None:
