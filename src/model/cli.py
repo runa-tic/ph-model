@@ -5,7 +5,7 @@ import argparse
 import logging
 
 
-from .crypto_data import (
+from model.crypto_data import (
     fetch_coin_info,
     fetch_ohlcv,
     plot_buyback_chart,
@@ -19,16 +19,18 @@ from .crypto_data import (
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch token info and OHLCV data")
-    parser.add_argument("ticker", help="Token ticker symbol, e.g. btc")
+    parser.add_argument("ticker", nargs="?", help="Token ticker symbol, e.g. btc")
     parser.add_argument("--output", default=None, help="Output CSV filename")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
+    ticker = args.ticker or input("Enter token ticker: ").strip()
+
     try:
-        info = fetch_coin_info(args.ticker)
-        ohlcv_map = fetch_ohlcv(args.ticker)
+        info = fetch_coin_info(ticker)
+        ohlcv_map = fetch_ohlcv(ticker)
     except ValueError as exc:
         print(exc)
         return
@@ -37,7 +39,7 @@ def main() -> None:
         print("No OHLCV data available")
         return
 
-    base = args.output or args.ticker.upper()
+    base = args.output or ticker.upper()
     if base.lower().endswith('.csv'):
         base = base[:-4]
     for ex, data in ohlcv_map.items():
