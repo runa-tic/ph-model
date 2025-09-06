@@ -44,6 +44,7 @@ EXCHANGE_ALIASES = {
     "gateio": "gate",
     "bybit_spot": "bybit",
     "bybit-spot": "bybit",
+    "okex": "okx",
 }
 
 
