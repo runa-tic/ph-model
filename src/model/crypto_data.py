@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import logging
 import math
+import sys
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Dict, List, Tuple
@@ -11,6 +12,12 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
+
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
 
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
@@ -44,6 +51,27 @@ EXCHANGE_ALIASES = {
     "gateio": "gate",
     "bybit_spot": "bybit",
     "bybit-spot": "bybit",
+    "okex": "okx",
+}
+
+# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
+# unsupported to avoid noisy warnings during normal operation.
+EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
+
+# Quote currencies considered "dollar" variations. Only markets using one of
+# these as the quote currency will be fetched. This avoids cross pairs such as
+# ``LTC/BTC`` or fiat pairs like ``BTC/JPY``.
+ALLOWED_QUOTES = {
+    "USD",
+    "USDT",
+    "USDC",
+    "BUSD",
+    "DAI",
+    "TUSD",
+    "USDD",
+    "USDP",
+    "PAX",
+    "GUSD",
 }
 
 
@@ -51,6 +79,14 @@ def _normalize_exchange_id(exchange_id: str) -> str:
     """Normalise CoinGecko market identifiers for ccxt."""
 
     return EXCHANGE_ALIASES.get(exchange_id.lower(), exchange_id.lower())
+
+
+def _normalize_pair(exchange_id: str, pair: str) -> str:
+    """Normalize trading pairs for specific exchanges."""
+
+    if exchange_id == "kraken":
+        return pair.replace("XBT", "BTC")
+    return pair
 
 
 logger = logging.getLogger(__name__)
@@ -132,38 +168,62 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
         ) from exc
     data = resp.json()
     markets: List[Tuple[str, str]] = []
+    base_upper = ticker.upper()
     for entry in data.get("tickers", []):
+        base = entry["base"].upper()
+        quote = entry["target"].upper()
+        if base != base_upper or quote not in ALLOWED_QUOTES:
+            continue
         exchange_id = entry["market"]["identifier"]
-        pair = f"{entry['base']}/{entry['target']}"
+        pair = f"{base}/{quote}"
+        exchange_id = _normalize_exchange_id(exchange_id)
+        pair = _normalize_pair(exchange_id, pair)
         markets.append((exchange_id, pair))
     return markets
 
 
-def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List[float]]]:
+def fetch_ohlcv(
+    ticker: str,
+    exchange: str | None = None,
+    progress: bool = False,
+    warnings: List[str] | None = None,
+) -> Tuple[Dict[str, List[List[float]]], List[str]]:
     """Fetch up to the last ``DAYS_LIMIT`` days of OHLCV data.
 
     When ``exchange`` is ``None`` data is fetched from *all* ccxt-supported
-    exchanges reported by CoinGecko. Results are returned in a dictionary
-    mapping exchange id to OHLCV rows. If no exchange yields data, the
-    function falls back to CoinGecko's OHLC endpoint with the key
-    ``"coingecko"``.
+    exchanges reported by CoinGecko. Returns a tuple ``(results, failures)``
+    where ``results`` maps exchange ids to OHLCV rows and ``failures`` lists
+    exchanges that yielded no data. If every exchange fails, the function
+    falls back to CoinGecko's OHLC endpoint with the key ``"coingecko"``.
+
+    Set ``progress=True`` to show a progress bar while iterating over exchanges.
+    When ``warnings`` is provided, any errors are appended to it instead of being
+    logged during the fetch. Callers can display the warnings afterwards,
+    keeping the progress bar stable.
     """
 
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
-    normalized_markets = [(_normalize_exchange_id(ex), pair) for ex, pair in markets]
-    supported_markets = [m for m in normalized_markets if m[0] in ccxt.exchanges]
+    supported_markets = [
+        m for m in markets if m[0] in ccxt.exchanges and m[0] not in EXCHANGE_BLACKLIST
+    ]
     markets_by_exchange: Dict[str, List[str]] = {}
     for ex, pair in supported_markets:
         markets_by_exchange.setdefault(ex, []).append(pair)
 
-    # Notify about markets that cannot be fetched via ccxt.
+    collected: List[str] = warnings if warnings is not None else []
+
+    # Record markets that cannot be fetched via ccxt or are blacklisted.
     unsupported = sorted(
-        {ex for ex, _ in markets if _normalize_exchange_id(ex) not in ccxt.exchanges}
+        {
+            ex
+            for ex, _ in markets
+            if ex not in ccxt.exchanges or ex in EXCHANGE_BLACKLIST
+        }
     )
     if unsupported:
-        logger.info("Unsupported exchanges: %s", ", ".join(unsupported))
+        collected.append("Unsupported exchanges: " + ", ".join(unsupported))
 
     exchanges_to_try = [exchange] if exchange else sorted(markets_by_exchange)
     if not exchanges_to_try:
@@ -173,6 +233,36 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
 
     now_ms = int(datetime.now(tz=timezone.utc).timestamp() * 1000)
     since_start = now_ms - DAYS_LIMIT * MS_IN_DAY
+
+    def _trades_to_ohlcv(trades: List[Dict], duration: int) -> List[List[float]]:
+        buckets: Dict[int, List[float]] = {}
+        for t in trades:
+            ts = int(math.floor(t["timestamp"] / duration) * duration)
+            price = t["price"]
+            amount = t["amount"]
+            ohlcv = buckets.setdefault(
+                ts, [ts, price, price, price, price, 0.0]
+            )
+            ohlcv[2] = max(ohlcv[2], price)
+            ohlcv[3] = min(ohlcv[3], price)
+            ohlcv[4] = price
+            ohlcv[5] += amount
+        return [buckets[k] for k in sorted(buckets)]
+
+    def _build_from_trades(ex, symbol: str, since: int) -> List[List[float]]:
+        timeframe = "1d"
+        duration = ex.parse_timeframe(timeframe) * 1000
+        all_data: List[List[float]] = []
+        start = since
+        while start < now_ms and len(all_data) < DAYS_LIMIT:
+            trades = ex.fetch_trades(symbol, since=start, limit=1000)
+            if not trades:
+                start += duration
+                continue
+            ohlcv = _trades_to_ohlcv(trades, duration)
+            all_data.extend(ohlcv)
+            start = trades[-1]["timestamp"] + 1
+        return all_data[-DAYS_LIMIT:]
 
     def _fetch_from_exchange(ex_name: str, symbol: str) -> List[List[float]]:
         exchange_class = getattr(ccxt, ex_name)({"enableRateLimit": True})
@@ -194,28 +284,38 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                     break
                 since = batch[-1][0] + MS_IN_DAY
             if all_data:
-                logger.info("Fetched %d rows from %s %s", len(all_data), ex_name, symbol)
+                logger.debug(
+                    "Fetched %d rows from %s %s", len(all_data), ex_name, symbol
+                )
                 return all_data[-DAYS_LIMIT:]
         except Exception as exc:
-            logger.warning("Failed to fetch %s on %s: %s", symbol, ex_name, exc)
+            logger.debug("Initial fetch failed for %s on %s: %s", symbol, ex_name, exc)
             try:
                 batch = exchange_class.fetch_ohlcv(
                     symbol, timeframe=timeframe, limit=DAYS_LIMIT
                 )
                 if batch:
-                    logger.info("Fetched %d rows from %s %s", len(batch), ex_name, symbol)
+                    logger.debug(
+                        "Fetched %d rows from %s %s", len(batch), ex_name, symbol
+                    )
                     return batch[-DAYS_LIMIT:]
             except Exception as exc2:
-                logger.warning(
-                    "Retry without since failed for %s on %s: %s",
-                    symbol,
-                    ex_name,
-                    exc2,
-                )
+                logger.debug("Fetching without since failed for %s on %s: %s", symbol, ex_name, exc2)
+                try:
+                    return _build_from_trades(exchange_class, symbol, since_start)
+                except Exception as exc3:
+                    collected.append(
+                        f"Failed to fetch {symbol} on {ex_name}: {exc3}"
+                    )
         return []
 
     # First try explicit markets reported by CoinGecko
-    for ex_name in exchanges_to_try:
+    iterator = tqdm(
+        exchanges_to_try,
+        desc="Fetching OHLCV",
+        disable=not progress or not sys.stdout.isatty(),
+    )
+    for ex_name in iterator:
         for symbol in markets_by_exchange.get(ex_name, []):
             data = _fetch_from_exchange(ex_name, symbol)
             if data:
@@ -224,11 +324,7 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
 
     # Try common trading pairs on exchanges that still lack data
     base_symbol = ticker.upper()
-    generic_pairs = [
-        f"{base_symbol}/USDT",
-        f"{base_symbol}/USD",
-        f"{base_symbol}/BTC",
-    ]
+    generic_pairs = [f"{base_symbol}/{q}" for q in ("USDT", "USD", "USDC")]
 
     for ex_name in exchanges_to_try:
         if ex_name in results:
@@ -247,8 +343,9 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                 results[ex_name] = data
                 break
 
+    failures = [ex for ex in exchanges_to_try if ex not in results]
     if results:
-        return results
+        return results, failures
 
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
@@ -272,7 +369,7 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
     data = data[-DAYS_LIMIT:]
 
     # CoinGecko's OHLC endpoint does not provide volume; set it to 0.0
-    return {"coingecko": [row + [0.0] for row in data]}
+    return {"coingecko": [row + [0.0] for row in data]}, failures
 
 
 def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]]) -> None:
