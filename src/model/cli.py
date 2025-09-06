@@ -4,8 +4,19 @@ from __future__ import annotations
 import argparse
 import logging
 
+try:
+    from colorama import Fore, Style, init
+except ModuleNotFoundError:  # pragma: no cover - fallback when colorama isn't bundled
+    class _NoColor:
+        def __getattr__(self, name: str) -> str:
+            return ""
 
-from .crypto_data import (
+    Fore = Style = _NoColor()
+
+    def init(*_args, **_kwargs):  # type: ignore
+        pass
+
+from model.crypto_data import (
     fetch_coin_info,
     fetch_ohlcv,
     plot_buyback_chart,
@@ -17,18 +28,57 @@ from .crypto_data import (
 )
 
 
+ASCII_ART = (
+    "                :::::::\n"
+    "             :============:\n"
+    "           ::=============::\n"
+    "          :-===========:=+++::              :::::::::::                                                    :::\n"
+    "        ::-===========:++++++-:             ::::::::::::    :::    ::                                      :::\n"
+    "     :: ::-========::++++++++-:             :::      ::::          ::                                      :::\n"
+    "         :-=======:=+++++++++-:             :::       :::   :::  :::::::  :: ::::  ::::::       :::::::    :::     :::  "
+    "  ::::::     ::: :::\n"
+    "      :: ::-===::+++++++++++::              ::::::::::::    :::    ::     ::::  :::::  ::::  :::::   ::::  :::  ::::   :"
+    ":::   :::::  ::::\n"
+    "     ::   :-==:=++++++++++++::              :::::::::::::   :::    ::     ::     :::    :::           :::  ::: :::     :"
+    "::      :::  :::\n"
+    "::      :    :++++++++++++:                 :::        :::  :::    ::     ::     :::    :::    :::::: :::  ::::::      :"
+    ":::::::::::  :::\n"
+    "    ::     :: :::++++++:::                  :::       ::::  :::    ::     ::     :::    :::  ::::    ::::  ::: :::::   :"
+    ":::    ::::  :::\n"
+    "      ::      ::    ::                      :::::::::::::   :::    :::::  ::     :::    :::    ::::::::::  :::   ::::   "
+    ":::::::::    :::\n"
+    "::        ::    :: ::                       ::::::::::::    :::     ::::  ::     :::    :::     ::::: :::  :::     :::  "
+    "  ::::::     :::\n"
+    "     ::  ::     ::\n"
+    "             :::\n"
+    "          ::\n"
+)
+
+
 def main() -> None:
+    init(autoreset=True)
+
+    def prompt(text: str) -> str:
+        return input(Fore.YELLOW + text + Style.RESET_ALL)
+
     parser = argparse.ArgumentParser(description="Fetch token info and OHLCV data")
-    parser.add_argument("ticker", help="Token ticker symbol, e.g. btc")
+    parser.add_argument("ticker", nargs="?", help="Token ticker symbol, e.g. btc")
     parser.add_argument("--output", default=None, help="Output CSV filename")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
+    print(Fore.CYAN + ASCII_ART)
+    print(Fore.CYAN + "Paper Hands Model [Version 1.0]")
+    print(Fore.CYAN + "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.")
+    print()
+
+    ticker = args.ticker or prompt("Enter token ticker: ").strip()
+
     try:
-        info = fetch_coin_info(args.ticker)
-        ohlcv_map = fetch_ohlcv(args.ticker)
+        info = fetch_coin_info(ticker)
+        ohlcv_map = fetch_ohlcv(ticker)
     except ValueError as exc:
         print(exc)
         return
@@ -37,7 +87,7 @@ def main() -> None:
         print("No OHLCV data available")
         return
 
-    base = args.output or args.ticker.upper()
+    base = args.output or ticker.upper()
     if base.lower().endswith('.csv'):
         base = base[:-4]
     for ex, data in ohlcv_map.items():
@@ -45,10 +95,10 @@ def main() -> None:
         save_to_csv(filename, info, data)
         print(f"Data written to {filename}")
 
-    mode = input("Select mode: buyback or liquidation (b/l): ").strip().lower()
+    mode = prompt("Select mode: buyback or liquidation (b/l): ").strip().lower()
     if mode.startswith("b"):
         try:
-            pct_input = input(
+            pct_input = prompt(
                 "Minimum intraday surge percentage (default 75): "
             ).strip()
             surge_pct = float(pct_input) if pct_input else 75.0
@@ -72,9 +122,9 @@ def main() -> None:
         print(f"Average PH percentage: {avg}")
 
         try:
-            final_price = float(input("Final desired price for buyback: "))
-            q_pct = float(input("Increase in sell rate q percentage: "))
-            step_input = input(
+            final_price = float(prompt("Final desired price for buyback: "))
+            q_pct = float(prompt("Increase in sell rate q percentage: "))
+            step_input = prompt(
                 "Price step percentage for schedule (default 5): "
             ).strip()
             step_pct = float(step_input) if step_input else 5.0
@@ -97,7 +147,7 @@ def main() -> None:
         print(f"Buyback chart written to {chart_file}")
     elif mode.startswith("l"):
         try:
-            pct_input = input(
+            pct_input = prompt(
                 "Maximum intraday selloff percentage (default -50): "
             ).strip()
             selloff_pct = float(pct_input) if pct_input else -50.0
@@ -121,11 +171,11 @@ def main() -> None:
         print(f"Average PH percentage: {avg}")
 
         try:
-            final_price = float(input("Final desired price for liquidation: "))
+            final_price = float(prompt("Final desired price for liquidation: "))
             q_pct = float(
-                input("Increase in sell buy rate q percentage: ")
+                prompt("Increase in sell buy rate q percentage: ")
             )
-            step_input = input(
+            step_input = prompt(
                 "Price step percentage for schedule (default 5): "
             ).strip()
             step_pct = float(step_input) if step_input else 5.0

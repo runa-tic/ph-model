@@ -46,13 +46,25 @@ paper-hands token buybacks.
 ## Usage
 
 ```bash
-python -m model.cli <ticker>
+crypto-fetch [ticker]
 ```
+
+If `ticker` is omitted, you will be prompted to enter it interactively.
+
+When launched, the tool displays an ASCII art banner followed by:
+
+```
+Paper Hands Model [Version 1.0]
+© Bitmaker L.L.C-FZ. All rights reserved.
+```
+
+If `colorama` is available, prompts are highlighted to provide a friendlier
+interface, but the CLI also runs without it for standalone builds.
 
 Example:
 
 ```bash
-python -m model.cli btc
+crypto-fetch btc
 ```
 
 Running the command performs the following steps:
@@ -73,6 +85,39 @@ Running the command performs the following steps:
    `<TICKER>_buyback.png`.
 
 Use the `--debug` flag to print detailed logging while the tool runs.
+
+### Build a standalone binary
+
+To distribute the CLI as a single executable (so end users do not need Python installed),
+bundle it with [PyInstaller](https://pyinstaller.org/):
+
+```bash
+pip install pyinstaller
+pyinstaller --name crypto-fetch --onefile src/model/cli.py --paths src
+```
+
+The compiled binary will be available in the `dist/` directory.
+
+### Run from Finder on macOS
+
+If you want to launch the binary by double-clicking in Finder, create a small
+wrapper script in the project root:
+
+```bash
+#!/bin/bash
+cd "$(dirname "$0")/dist"
+./crypto-fetch "$@"
+read -p "Press Enter to close..."
+```
+
+Save this as `crypto-fetch.command` and make it executable:
+
+```bash
+chmod +x crypto-fetch.command
+```
+
+Double-clicking `crypto-fetch.command` opens Terminal, runs the compiled
+binary, and keeps the window open until you press Enter.
 
 ## Buyback model
 
