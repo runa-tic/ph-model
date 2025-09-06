@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple
 import ccxt
 import requests
 
+
 try:
     from tqdm import tqdm
 except Exception:  # pragma: no cover - fallback when tqdm is missing
