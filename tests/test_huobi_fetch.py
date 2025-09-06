@@ -12,10 +12,14 @@ def test_fetch_ohlcv_huobi(monkeypatch):
 
     class Huobi:
         symbols = ["BTC/USDT"]
+        options = {}
+
         def __init__(self, params=None):
             pass
+
         def load_markets(self):
             return
+
         def fetch_ohlcv(self, symbol, timeframe="1d", since=0, limit=1000):
             assert symbol == "BTC/USDT"
             assert since > 0
