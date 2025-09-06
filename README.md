@@ -79,11 +79,13 @@ Running the command performs the following steps:
    are available.
 3. Download up to 364 days of OHLCV data from the chosen exchange or, if
    exchanges fail, from CoinGecko.
-4. Write `dist/datasets/<TICKER>_data.csv` containing the current price,
-   circulating supply and OHLCV history.
-5. Generate `dist/datasets/<TICKER>_surges.csv` with five-day windows around
-   `high / open >= 1.75`, including `ph_volume` and `ph_percentage` columns, and
-   print the average paper-hands percentage.
+4. Write one CSV per exchange under `dist/datasets/` containing the current
+   price, circulating supply and OHLCV history, then summarise how many
+   exchanges succeeded or failed.
+5. Generate `dist/datasets/<TICKER>_<EXCHANGE>_surges.csv` files with five-day
+   windows around `high / open >= 1.75`, including `ph_volume` and
+   `ph_percentage` columns, and print the average paper-hands percentage across
+   exchanges.
 6. Prompt for a final buyback price and a percentage `q` increase in sell rate,
    then create `dist/datasets/<TICKER>_buyback.csv` together with a chart
    `dist/datasets/<TICKER>_buyback.png`.

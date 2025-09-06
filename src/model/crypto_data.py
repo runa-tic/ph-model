@@ -140,14 +140,16 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
     return markets
 
 
-def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List[float]]]:
+def fetch_ohlcv(
+    ticker: str, exchange: str | None = None
+) -> Tuple[Dict[str, List[List[float]]], List[str]]:
     """Fetch up to the last ``DAYS_LIMIT`` days of OHLCV data.
 
     When ``exchange`` is ``None`` data is fetched from *all* ccxt-supported
-    exchanges reported by CoinGecko. Results are returned in a dictionary
-    mapping exchange id to OHLCV rows. If no exchange yields data, the
-    function falls back to CoinGecko's OHLC endpoint with the key
-    ``"coingecko"``.
+    exchanges reported by CoinGecko. Returns a tuple ``(results, failures)``
+    where ``results`` maps exchange ids to OHLCV rows and ``failures`` lists
+    exchanges that yielded no data. If every exchange fails, the function
+    falls back to CoinGecko's OHLC endpoint with the key ``"coingecko"``.
     """
 
     markets = _coin_markets(ticker)
@@ -195,7 +197,9 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                     break
                 since = batch[-1][0] + MS_IN_DAY
             if all_data:
-                logger.info("Fetched %d rows from %s %s", len(all_data), ex_name, symbol)
+                logger.debug(
+                    "Fetched %d rows from %s %s", len(all_data), ex_name, symbol
+                )
                 return all_data[-DAYS_LIMIT:]
         except Exception as exc:
             logger.warning("Failed to fetch %s on %s: %s", symbol, ex_name, exc)
@@ -204,7 +208,9 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                     symbol, timeframe=timeframe, limit=DAYS_LIMIT
                 )
                 if batch:
-                    logger.info("Fetched %d rows from %s %s", len(batch), ex_name, symbol)
+                    logger.debug(
+                        "Fetched %d rows from %s %s", len(batch), ex_name, symbol
+                    )
                     return batch[-DAYS_LIMIT:]
             except Exception as exc2:
                 logger.warning(
@@ -248,8 +254,9 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
                 results[ex_name] = data
                 break
 
+    failures = [ex for ex in exchanges_to_try if ex not in results]
     if results:
-        return results
+        return results, failures
 
     # Fall back to CoinGecko's OHLC endpoint if all ccxt markets fail
     logger.info("Falling back to CoinGecko OHLC for %s", ticker)
@@ -273,7 +280,7 @@ def fetch_ohlcv(ticker: str, exchange: str | None = None) -> Dict[str, List[List
     data = data[-DAYS_LIMIT:]
 
     # CoinGecko's OHLC endpoint does not provide volume; set it to 0.0
-    return {"coingecko": [row + [0.0] for row in data]}
+    return {"coingecko": [row + [0.0] for row in data]}, failures
 
 
 def save_to_csv(filename: str, info: Dict[str, float], ohlcv: List[List[float]]) -> None:

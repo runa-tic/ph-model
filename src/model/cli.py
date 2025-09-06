@@ -100,7 +100,7 @@ def main() -> None:
 
     try:
         info = fetch_coin_info(ticker)
-        ohlcv_map = fetch_ohlcv(ticker)
+        ohlcv_map, failures = fetch_ohlcv(ticker)
     except ValueError as exc:
         print(exc)
         return
@@ -122,7 +122,11 @@ def main() -> None:
     for ex, data in ohlcv_map.items():
         filename = datasets_dir / f"{base}_{ex}_data.csv"
         save_to_csv(filename, info, data)
-        print(f"Data written to {filename}")
+
+    print(
+        f"{ticker.upper()} data for {len(ohlcv_map)} exchanges successfully fetched, "
+        f"{len(failures)} exchanges failed. Files saved to {datasets_dir}"
+    )
 
     mode = prompt("Select mode: buyback or liquidation (b/l): ").strip().lower()
     if mode.startswith("b"):
@@ -144,8 +148,6 @@ def main() -> None:
                 info["circulating_supply"],
                 1 + surge_pct / 100,
             )
-            print(f"Surge snippets written to {surge_filename}")
-            print(f"Average PH percentage on {ex}: {avg}")
             avgs.append(avg)
         avg = sum(avgs) / len(avgs) if avgs else 0.0
         print(f"Average PH percentage: {avg}")
@@ -183,6 +185,10 @@ def main() -> None:
         except ValueError:
             print("Invalid numeric input")
             return
+        if selloff_pct > 0:
+            print(
+                f"Interpreting {selloff_pct}% as -{selloff_pct}% (selloff percentages should be negative)."
+            )
         selloff_pct = -abs(selloff_pct)
         avgs = []
         for ex, data in ohlcv_map.items():
@@ -193,8 +199,6 @@ def main() -> None:
                 info["circulating_supply"],
                 1 + selloff_pct / 100,
             )
-            print(f"Selloff snippets written to {selloff_filename}")
-            print(f"Average PH percentage on {ex}: {avg}")
             avgs.append(avg)
         avg = sum(avgs) / len(avgs) if avgs else 0.0
         print(f"Average PH percentage: {avg}")

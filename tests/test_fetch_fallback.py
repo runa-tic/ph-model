@@ -30,6 +30,7 @@ def test_fetch_ohlcv_generic_exchange(monkeypatch):
     fake_ccxt = types.SimpleNamespace(exchanges=["fake"], fake=FakeExchange)
     monkeypatch.setattr(crypto_data, "ccxt", fake_ccxt)
 
-    data = crypto_data.fetch_ohlcv("fury")
+    data, failures = crypto_data.fetch_ohlcv("fury")
+    assert failures == []
     assert set(data.keys()) == {"fake"}
     assert data["fake"][0][1:] == [1, 2, 3, 4, 5]
