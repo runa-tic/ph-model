@@ -13,7 +13,6 @@ from typing import Dict, List, Tuple
 import ccxt
 import requests
 
-
 try:
     from tqdm import tqdm
 except Exception:  # pragma: no cover - fallback when tqdm is missing
@@ -59,9 +58,6 @@ EXCHANGE_ALIASES = {
     "p2pb2b": "p2b",
 }
 
-# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
-# unsupported to avoid noisy warnings during normal operation.
-EXCHANGE_BLACKLIST = {"lbank", "phemex", "latoken"}
 
 # Quote currencies considered "dollar" variations. Only markets using one of
 # these as the quote currency will be fetched. This avoids cross pairs such as
