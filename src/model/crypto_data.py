@@ -20,6 +20,12 @@ except Exception:  # pragma: no cover - fallback when tqdm is missing
     def tqdm(iterable, **_):
         return iterable
 
+try:
+    from tqdm import tqdm
+except Exception:  # pragma: no cover - fallback when tqdm is missing
+    def tqdm(iterable, **_):
+        return iterable
+
 
 COINGECKO_API = "https://api.coingecko.com/api/v3"
 
@@ -163,7 +169,10 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
 
 
 def fetch_ohlcv(
-    ticker: str, exchange: str | None = None, progress: bool = False
+    ticker: str,
+    exchange: str | None = None,
+    progress: bool = False,
+    warnings: List[str] | None = None,
 ) -> Tuple[Dict[str, List[List[float]]], List[str]]:
     """Fetch up to the last ``DAYS_LIMIT`` days of OHLCV data.
 
@@ -174,17 +183,24 @@ def fetch_ohlcv(
     falls back to CoinGecko's OHLC endpoint with the key ``"coingecko"``.
 
     Set ``progress=True`` to show a progress bar while iterating over exchanges.
+    When ``warnings`` is provided, any errors are appended to it instead of being
+    logged during the fetch. Callers can display the warnings afterwards,
+    keeping the progress bar stable.
     """
 
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
-    supported_markets = [m for m in markets if m[0] in ccxt.exchanges and m[0] not in EXCHANGE_BLACKLIST]
+    supported_markets = [
+        m for m in markets if m[0] in ccxt.exchanges and m[0] not in EXCHANGE_BLACKLIST
+    ]
     markets_by_exchange: Dict[str, List[str]] = {}
     for ex, pair in supported_markets:
         markets_by_exchange.setdefault(ex, []).append(pair)
 
-    # Notify about markets that cannot be fetched via ccxt or are blacklisted.
+    collected: List[str] = warnings if warnings is not None else []
+
+    # Record markets that cannot be fetched via ccxt or are blacklisted.
     unsupported = sorted(
         {
             ex
@@ -193,7 +209,7 @@ def fetch_ohlcv(
         }
     )
     if unsupported:
-        logger.info("Unsupported exchanges: %s", ", ".join(unsupported))
+        collected.append("Unsupported exchanges: " + ", ".join(unsupported))
 
     exchanges_to_try = [exchange] if exchange else sorted(markets_by_exchange)
     if not exchanges_to_try:
@@ -229,7 +245,7 @@ def fetch_ohlcv(
                 )
                 return all_data[-DAYS_LIMIT:]
         except Exception as exc:
-            logger.warning("Failed to fetch %s on %s: %s", symbol, ex_name, exc)
+            logger.debug("Initial fetch failed for %s on %s: %s", symbol, ex_name, exc)
             try:
                 batch = exchange_class.fetch_ohlcv(
                     symbol, timeframe=timeframe, limit=DAYS_LIMIT
@@ -240,12 +256,7 @@ def fetch_ohlcv(
                     )
                     return batch[-DAYS_LIMIT:]
             except Exception as exc2:
-                logger.warning(
-                    "Retry without since failed for %s on %s: %s",
-                    symbol,
-                    ex_name,
-                    exc2,
-                )
+                collected.append(f"Failed to fetch {symbol} on {ex_name}: {exc2}")
         return []
 
     # First try explicit markets reported by CoinGecko

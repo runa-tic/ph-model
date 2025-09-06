@@ -5,6 +5,7 @@ import argparse
 import logging
 import sys
 from pathlib import Path
+from typing import List
 
 try:
     from colorama import Fore, Style, init
@@ -98,9 +99,10 @@ def main() -> None:
 
     ticker = args.ticker or prompt("Enter token ticker: ").strip()
 
+    warns: List[str] = []
     try:
         info = fetch_coin_info(ticker)
-        ohlcv_map, failures = fetch_ohlcv(ticker, progress=True)
+        ohlcv_map, failures = fetch_ohlcv(ticker, progress=True, warnings=warns)
     except ValueError as exc:
         print(exc)
         return
@@ -127,6 +129,10 @@ def main() -> None:
         f"{ticker.upper()} data for {len(ohlcv_map)} exchanges successfully fetched, "
         f"{len(failures)} exchanges failed. Files saved to {datasets_dir}"
     )
+    if warns:
+        print("Warnings:")
+        for msg in warns:
+            print(f"  - {msg}")
 
     mode = prompt("Select mode: buyback or liquidation (b/l): ").strip().lower()
     if mode.startswith("b"):
