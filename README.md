@@ -51,7 +51,7 @@ crypto-fetch [ticker]
 
 If `ticker` is omitted, you will be prompted to enter it interactively.
 
-When launched, the tool displays an animated ASCII art banner followed by:
+When launched, the tool displays a brief introduction:
 
 ```
 Paper Hands Model [Version 1.0]

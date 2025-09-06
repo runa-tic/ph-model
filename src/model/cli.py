@@ -91,7 +91,11 @@ def main() -> None:
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
-    animate_banner()
+    print(
+        Fore.CYAN
+        + "Paper Hands Model [Version 1.0]\n"
+        + "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.\n"
+    )
 
     ticker = args.ticker or prompt("Enter token ticker: ").strip()
 
