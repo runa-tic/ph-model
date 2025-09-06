@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import multiprocessing
 import sys
 from pathlib import Path
 from typing import List
@@ -78,6 +79,7 @@ def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
 
 
 def main() -> None:
+    multiprocessing.freeze_support()
     init(autoreset=True)
 
     def prompt(text: str) -> str:
@@ -87,9 +89,11 @@ def main() -> None:
     parser.add_argument("ticker", nargs="?", help="Token ticker symbol, e.g. btc")
     parser.add_argument("--output", default=None, help="Output CSV filename")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    args = parser.parse_args()
+    args, _unknown = parser.parse_known_args()
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+    if _unknown:
+        logging.debug("Ignoring extra args: %s", _unknown)
 
     print(
         Fore.CYAN
