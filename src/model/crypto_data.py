@@ -117,7 +117,8 @@ def _get_coin_id(ticker: str) -> str:
         print(f"{idx}. {coin['name']} ({coin['id']})")
 
     while True:
-        choice = input(f"Select coin [1-{len(coins)}]: ")
+        choice = input(f"Select coin [1-{len(coins)}]:\n")
+        print()
         try:
             idx = int(choice)
             if 1 <= idx <= len(coins):
@@ -145,7 +146,8 @@ def fetch_coin_info(ticker: str) -> Dict[str, float]:
     if not supply:
         print("Failed to fetch circulating supply from CoinGecko.")
         while True:
-            user_input = input("Please enter the circulating supply manually: ")
+            user_input = input("Please enter the circulating supply manually:\n")
+            print()
             try:
                 supply = float(user_input)
                 if supply > 0:
