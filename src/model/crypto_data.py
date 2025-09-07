@@ -168,11 +168,10 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
         ) from exc
     data = resp.json()
     markets: List[Tuple[str, str]] = []
-    base_upper = ticker.upper()
     for entry in data.get("tickers", []):
         base = entry["base"].upper()
         quote = entry["target"].upper()
-        if base != base_upper or quote not in ALLOWED_QUOTES:
+        if quote not in ALLOWED_QUOTES:
             continue
         exchange_id = entry["market"]["identifier"]
         pair = f"{base}/{quote}"
