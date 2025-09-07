@@ -10,17 +10,7 @@ import time
 from pathlib import Path
 from typing import List
 
-try:
-    from colorama import Fore, Style, init
-except ModuleNotFoundError:  # pragma: no cover - fallback when colorama isn't bundled
-    class _NoColor:
-        def __getattr__(self, name: str) -> str:
-            return ""
-
-    Fore = Style = _NoColor()
-
-    def init(*_args, **_kwargs):  # type: ignore
-        pass
+from colorama import Fore, Style, init
 
 from model.crypto_data import (
     fetch_coin_info,
