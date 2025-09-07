@@ -48,4 +48,4 @@ def test_fetch_coin_info_prompts_for_supply(monkeypatch):
     monkeypatch.setattr("builtins.input", fake_input)
     info = crypto_data.fetch_coin_info("foo")
     assert info["circulating_supply"] == 12345.0
-    assert captured["prompt"].endswith("\n")
+    assert not captured["prompt"].endswith("\n")
