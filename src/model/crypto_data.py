@@ -12,9 +12,7 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
-from colorama import Fore, Style, init
-
-init(autoreset=True)
+from colorama import Fore, Style
 
 try:
     from tqdm import tqdm
