@@ -8,7 +8,10 @@ from model import crypto_data
 
 
 def test_prints_available_exchanges(monkeypatch, capsys):
-    markets = [("foo", "BTC/USDT"), ("bar", "BTC/USDT")]
+    markets = [
+        (crypto_data._normalize_exchange_id("gdax"), "BTC/USDT"),
+        ("bar", "BTC/USDT"),
+    ]
     monkeypatch.setattr(crypto_data, "_coin_markets", lambda ticker: markets)
 
     class DummyExchange:
@@ -30,5 +33,6 @@ def test_prints_available_exchanges(monkeypatch, capsys):
 
     crypto_data.fetch_ohlcv("btc", exchange="foo")
     out = capsys.readouterr().out
-    assert "foo" in out
+    assert "coinbase" in out
     assert "bar" in out
+    assert "gdax" not in out

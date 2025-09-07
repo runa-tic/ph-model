@@ -54,6 +54,7 @@ EXCHANGE_ALIASES = {
     "okex": "okx",
     "crypto_com": "cryptocom",
     "hashkey_exchange": "hashkey",
+    "gdax": "coinbase",
     "huobi": "huobi",
     "p2pb2b": "p2b",
 }
@@ -724,6 +725,12 @@ def plot_buyback_chart(csv_filename: str, image_filename: str) -> None:
                 continue
     if not prices:
         return
+    import logging
+    import matplotlib
+
+    # Suppress verbose font manager warnings and ensure a headless backend.
+    logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     plt.figure()
