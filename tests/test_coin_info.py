@@ -39,6 +39,13 @@ def test_fetch_coin_info_prompts_for_supply(monkeypatch):
             }
 
     monkeypatch.setattr(crypto_data.requests, "get", lambda url, timeout=30: Resp())
-    monkeypatch.setattr("builtins.input", lambda prompt="": "12345")
+    captured = {}
+
+    def fake_input(prompt=""):
+        captured["prompt"] = prompt
+        return "12345"
+
+    monkeypatch.setattr("builtins.input", fake_input)
     info = crypto_data.fetch_coin_info("foo")
     assert info["circulating_supply"] == 12345.0
+    assert captured["prompt"].endswith("\n")
