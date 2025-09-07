@@ -12,31 +12,6 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
-from tqdm import tqdm
-
-try:
-    from tqdm import tqdm
-except Exception:  # pragma: no cover - fallback when tqdm is missing
-    def tqdm(iterable, **_):
-        return iterable
-
-try:
-    from tqdm import tqdm
-except Exception:  # pragma: no cover - fallback when tqdm is missing
-    def tqdm(iterable, **_):
-        return iterable
-
-try:
-    from tqdm import tqdm
-except Exception:  # pragma: no cover - fallback when tqdm is missing
-    def tqdm(iterable, **_):
-        return iterable
-
-try:
-    from tqdm import tqdm
-except Exception:  # pragma: no cover - fallback when tqdm is missing
-    def tqdm(iterable, **_):
-        return iterable
 
 try:
     from tqdm import tqdm
@@ -79,15 +54,11 @@ EXCHANGE_ALIASES = {
     "okex": "okx",
     "crypto_com": "cryptocom",
     "hashkey_exchange": "hashkey",
-    "huobi": "htx",
+    "gdax": "coinbase",
+    "huobi": "huobi",
     "p2pb2b": "p2b",
 }
 
-# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
-# unsupported to avoid noisy warnings during normal operation. Currently empty
-# so all exchanges are attempted.
-EXCHANGE_BLACKLIST: set[str] = set()
-
 # Quote currencies considered "dollar" variations. Only markets using one of
 # these as the quote currency will be fetched. This avoids cross pairs such as
 # ``LTC/BTC`` or fiat pairs like ``BTC/JPY``.
@@ -103,30 +74,6 @@ ALLOWED_QUOTES = {
     "PAX",
     "GUSD",
 }
-
-# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
-# unsupported to avoid noisy warnings during normal operation.
-EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
-
-# Quote currencies considered "dollar" variations. Only markets using one of
-# these as the quote currency will be fetched. This avoids cross pairs such as
-# ``LTC/BTC`` or fiat pairs like ``BTC/JPY``.
-ALLOWED_QUOTES = {
-    "USD",
-    "USDT",
-    "USDC",
-    "BUSD",
-    "DAI",
-    "TUSD",
-    "USDD",
-    "USDP",
-    "PAX",
-    "GUSD",
-}
-
-# Exchanges that consistently fail to provide OHLCV data via ccxt. Treat them as
-# unsupported to avoid noisy warnings during normal operation.
-EXCHANGE_BLACKLIST = {"huobi", "lbank", "phemex", "latoken"}
 
 
 def _normalize_exchange_id(exchange_id: str) -> str:
@@ -170,10 +117,12 @@ def _get_coin_id(ticker: str) -> str:
         print(f"{idx}. {coin['name']} ({coin['id']})")
 
     while True:
-        choice = input(f"Select coin [1-{len(coins)}]: ")
+        choice = input(f"Select coin [1-{len(coins)}]:\n")
+        print()
         try:
             idx = int(choice)
             if 1 <= idx <= len(coins):
+                print("\033[H\033[2J", end="")
                 return coins[idx - 1]["id"]
         except ValueError:
             pass
@@ -197,7 +146,8 @@ def fetch_coin_info(ticker: str) -> Dict[str, float]:
     if not supply:
         print("Failed to fetch circulating supply from CoinGecko.")
         while True:
-            user_input = input("Please enter the circulating supply manually: ")
+            user_input = input("Please enter the circulating supply manually:\n")
+            print()
             try:
                 supply = float(user_input)
                 if supply > 0:
@@ -222,11 +172,10 @@ def _coin_markets(ticker: str) -> List[Tuple[str, str]]:
         ) from exc
     data = resp.json()
     markets: List[Tuple[str, str]] = []
-    base_upper = ticker.upper()
     for entry in data.get("tickers", []):
         base = entry["base"].upper()
         quote = entry["target"].upper()
-        if base != base_upper or quote not in ALLOWED_QUOTES:
+        if quote not in ALLOWED_QUOTES:
             continue
         exchange_id = entry["market"]["identifier"]
         pair = f"{base}/{quote}"
@@ -259,23 +208,23 @@ def fetch_ohlcv(
     markets = _coin_markets(ticker)
     logger.debug("Found %d markets for %s", len(markets), ticker)
 
-    supported_markets = [
-        m for m in markets if m[0] in ccxt.exchanges and m[0] not in EXCHANGE_BLACKLIST
-    ]
+    # Display all exchanges reported by CoinGecko so users can verify which
+    # markets will be attempted.
+    discovered = sorted({ex for ex, _ in markets})
+    if discovered:
+        print("Available exchanges:", ", ".join(discovered))
+    else:
+        print("No exchanges reported on CoinGecko")
+
+    supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
     markets_by_exchange: Dict[str, List[str]] = {}
     for ex, pair in supported_markets:
         markets_by_exchange.setdefault(ex, []).append(pair)
 
     collected: List[str] = warnings if warnings is not None else []
 
-    # Record markets that cannot be fetched via ccxt or are blacklisted.
-    unsupported = sorted(
-        {
-            ex
-            for ex, _ in markets
-            if ex not in ccxt.exchanges or ex in EXCHANGE_BLACKLIST
-        }
-    )
+    # Record markets that cannot be fetched via ccxt.
+    unsupported = sorted({ex for ex, _ in markets if ex not in ccxt.exchanges})
     if unsupported:
         collected.append("Unsupported exchanges: " + ", ".join(unsupported))
 
@@ -320,6 +269,9 @@ def fetch_ohlcv(
 
     def _fetch_from_exchange(ex_name: str, symbol: str) -> List[List[float]]:
         exchange_class = getattr(ccxt, ex_name)({"enableRateLimit": True})
+        if ex_name == "huobi":
+            exchange_class.options["defaultType"] = "spot"
+            exchange_class.options["fetchMarkets"] = {"types": {"spot": True}}
         timeframe = "1d"
         since = since_start
         all_data: List[List[float]] = []
@@ -776,6 +728,12 @@ def plot_buyback_chart(csv_filename: str, image_filename: str) -> None:
                 continue
     if not prices:
         return
+    import logging
+    import matplotlib
+
+    # Suppress verbose font manager warnings and ensure a headless backend.
+    logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     plt.figure()
