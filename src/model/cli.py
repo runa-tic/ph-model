@@ -51,20 +51,33 @@ def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
         "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.",
         "",
     ]
+    width = max(len(line) for line in lines)
+
+    def colour_line(text: str, row: int) -> str:
+        threshold = width - row * width // len(lines)
+        coloured = []
+        for col, ch in enumerate(text.ljust(width)):
+            if ch == " ":
+                coloured.append(" ")
+            else:
+                colour = Fore.CYAN if col < threshold else Fore.LIGHTRED_EX
+                coloured.append(colour + ch)
+        return "".join(coloured)
+
     for _ in range(frames):
         print("\033[H\033[2J", end="")
-        for line in lines:
+        for idx, line in enumerate(lines):
             animated = "".join(
                 random.choice(VARIANTS) if ch != " " else " " for ch in line
             )
-            print(Fore.CYAN + animated)
+            print(colour_line(animated, idx))
         for line in footer:
             print(Fore.CYAN + line)
         sys.stdout.flush()
         time.sleep(delay)
     print("\033[H\033[2J", end="")
-    for line in lines:
-        print(Fore.CYAN + line)
+    for idx, line in enumerate(lines):
+        print(colour_line(line, idx))
     for line in footer:
         print(Fore.CYAN + line)
     print()
@@ -73,6 +86,7 @@ def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
 def main() -> None:
     multiprocessing.freeze_support()
     init(autoreset=True)
+    animate_banner()
 
     GRAY = Fore.LIGHTBLACK_EX
     WHITE = Fore.WHITE
@@ -92,11 +106,6 @@ def main() -> None:
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     if _unknown:
         logging.debug("Ignoring extra args: %s", _unknown)
-
-    console(
-        "Paper Hands Model [Version 1.0]\n"
-        "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.\n"
-    )
 
     ticker = args.ticker or prompt("Enter token ticker: ").strip()
 
