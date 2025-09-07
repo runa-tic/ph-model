@@ -45,5 +45,6 @@ def test_fetch_coin_info_prompts_for_supply(monkeypatch, capsys):
     assert info["circulating_supply"] == 12345.0
     out = capsys.readouterr().out
     ansi = re.compile(r"\x1b\[[0-9;]*m")
+    assert ansi.search(out)
     clean = ansi.sub("", out)
     assert "Please enter the circulating supply manually: \n" not in clean
