@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import logging
 import multiprocessing
+import random
 import sys
+import time
 from pathlib import Path
 from typing import List
 
@@ -82,8 +84,14 @@ def main() -> None:
     multiprocessing.freeze_support()
     init(autoreset=True)
 
+    GRAY = Fore.LIGHTBLACK_EX
+    WHITE = Fore.WHITE
+
+    def console(text: str = "", end: str = "\n") -> None:
+        print(GRAY + text + Style.RESET_ALL, end=end)
+
     def prompt(text: str) -> str:
-        return input(Fore.YELLOW + text + Style.RESET_ALL)
+        return input(GRAY + text + Style.RESET_ALL + WHITE)
 
     parser = argparse.ArgumentParser(description="Fetch token info and OHLCV data")
     parser.add_argument("ticker", nargs="?", help="Token ticker symbol, e.g. btc")
@@ -95,10 +103,9 @@ def main() -> None:
     if _unknown:
         logging.debug("Ignoring extra args: %s", _unknown)
 
-    print(
-        Fore.CYAN
-        + "Paper Hands Model [Version 1.0]\n"
-        + "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.\n"
+    console(
+        "Paper Hands Model [Version 1.0]\n"
+        "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.\n"
     )
 
     ticker = args.ticker or prompt("Enter token ticker: ").strip()
@@ -108,11 +115,11 @@ def main() -> None:
         info = fetch_coin_info(ticker)
         ohlcv_map, failures = fetch_ohlcv(ticker, progress=True, warnings=warns)
     except ValueError as exc:
-        print(exc)
+        console(str(exc))
         return
 
     if not ohlcv_map:
-        print("No OHLCV data available")
+        console("No OHLCV data available")
         return
 
     if getattr(sys, "frozen", False):
@@ -129,24 +136,25 @@ def main() -> None:
         filename = datasets_dir / f"{base}_{ex}_data.csv"
         save_to_csv(filename, info, data)
 
-    print(
+    console(
         f"{ticker.upper()} data for {len(ohlcv_map)} exchanges successfully fetched, "
         f"{len(failures)} exchanges failed. Files saved to {datasets_dir}"
     )
     if warns:
-        print("Warnings:")
+        console("Warnings:")
         for msg in warns:
-            print(f"  - {msg}")
+            console(f"  - {msg}")
 
     mode = prompt("Select mode: buyback or liquidation (b/l): ").strip().lower()
     if mode.startswith("b"):
         try:
+            console()
             pct_input = prompt(
                 "Minimum intraday surge percentage (default 75): "
             ).strip()
             surge_pct = float(pct_input) if pct_input else 75.0
         except ValueError:
-            print("Invalid numeric input")
+            console("Invalid numeric input")
             return
         surge_pct = abs(surge_pct)
         avgs = []
@@ -160,17 +168,20 @@ def main() -> None:
             )
             avgs.append(avg)
         avg = sum(avgs) / len(avgs) if avgs else 0.0
-        print(f"Average PH percentage: {avg}")
+        console(f"Average PH percentage: {avg}")
 
         try:
+            console()
             final_price = float(prompt("Final desired price for buyback: "))
+            console()
             q_pct = float(prompt("Increase in sell rate q percentage: "))
+            console()
             step_input = prompt(
                 "Price step percentage for schedule (default 5): "
             ).strip()
             step_pct = float(step_input) if step_input else 5.0
         except ValueError:
-            print("Invalid numeric input")
+            console("Invalid numeric input")
             return
         buyback_filename = datasets_dir / f"{base}_buyback.csv"
         save_buyback_model(
@@ -182,21 +193,22 @@ def main() -> None:
             q_pct,
             step_pct,
         )
-        print(f"Buyback model written to {buyback_filename}")
+        console(f"Buyback model written to {buyback_filename}")
         chart_file = datasets_dir / f"{base}_buyback.png"
         plot_buyback_chart(buyback_filename, chart_file)
-        print(f"Buyback chart written to {chart_file}")
+        console(f"Buyback chart written to {chart_file}")
     elif mode.startswith("l"):
         try:
+            console()
             pct_input = prompt(
                 "Maximum intraday selloff percentage (default -50): "
             ).strip()
             selloff_pct = float(pct_input) if pct_input else -50.0
         except ValueError:
-            print("Invalid numeric input")
+            console("Invalid numeric input")
             return
         if selloff_pct > 0:
-            print(
+            console(
                 f"Interpreting {selloff_pct}% as -{selloff_pct}% (selloff percentages should be negative)."
             )
         selloff_pct = -abs(selloff_pct)
@@ -211,19 +223,20 @@ def main() -> None:
             )
             avgs.append(avg)
         avg = sum(avgs) / len(avgs) if avgs else 0.0
-        print(f"Average PH percentage: {avg}")
+        console(f"Average PH percentage: {avg}")
 
         try:
+            console()
             final_price = float(prompt("Final desired price for liquidation: "))
-            q_pct = float(
-                prompt("Increase in sell buy rate q percentage: ")
-            )
+            console()
+            q_pct = float(prompt("Increase in sell buy rate q percentage: "))
+            console()
             step_input = prompt(
                 "Price step percentage for schedule (default 5): "
             ).strip()
             step_pct = float(step_input) if step_input else 5.0
         except ValueError:
-            print("Invalid numeric input")
+            console("Invalid numeric input")
             return
         liquidation_filename = datasets_dir / f"{base}_liquidation.csv"
         save_liquidation_model(
@@ -235,9 +248,9 @@ def main() -> None:
             q_pct,
             step_pct,
         )
-        print(f"Liquidation model written to {liquidation_filename}")
+        console(f"Liquidation model written to {liquidation_filename}")
     else:
-        print("Invalid mode selected")
+        console("Invalid mode selected")
         return
 
 
