@@ -83,9 +83,9 @@ def main() -> None:
     init(autoreset=True)
 
     def prompt(text: str) -> str:
-        value = input(Fore.YELLOW + text + Style.RESET_ALL + "\n")
-        print()
-        return value
+        sys.stdout.write(Fore.YELLOW + text + Style.RESET_ALL)
+        sys.stdout.flush()
+        return input()
 
     parser = argparse.ArgumentParser(description="Fetch token info and OHLCV data")
     parser.add_argument("ticker", nargs="?", help="Token ticker symbol, e.g. btc")
