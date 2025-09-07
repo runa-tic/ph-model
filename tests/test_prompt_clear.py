@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -25,5 +26,7 @@ def test_get_coin_id_clears_without_newline(monkeypatch, capsys):
     coin_id = crypto_data._get_coin_id("btc")
     assert coin_id == "coin-a"
     out = capsys.readouterr().out
-    assert "Select coin [1-2]: \n" not in out
-    assert out.endswith("\033[H\033[2J")
+    ansi = re.compile(r"\x1b\[[0-9;]*m")
+    clean = ansi.sub("", out)
+    assert "Select coin [1-2]: \n" not in clean
+    assert clean.endswith("\033[H\033[2J")

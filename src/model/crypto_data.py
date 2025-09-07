@@ -12,6 +12,14 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
+try:
+    from colorama import Fore, Style
+except ModuleNotFoundError:  # pragma: no cover
+    class _NoColor:
+        def __getattr__(self, name: str) -> str:
+            return ""
+
+    Fore = Style = _NoColor()
 
 try:
     from tqdm import tqdm
@@ -112,12 +120,22 @@ def _get_coin_id(ticker: str) -> str:
     if len(coins) == 1:
         return coins[0]["id"]
 
-    print(f"Multiple coins found for ticker '{ticker}':")
+    gray = Fore.LIGHTBLACK_EX
+    white = Fore.WHITE
+
+    print(gray + f"Multiple coins found for ticker '{ticker}':" + Style.RESET_ALL)
     for idx, coin in enumerate(coins, start=1):
-        print(f"{idx}. {coin['name']} ({coin['id']})")
+        print(gray + f"{idx}. {coin['name']} ({coin['id']})" + Style.RESET_ALL)
 
     while True:
-        print(f"Select coin [1-{len(coins)}]: ", end="", flush=True)
+        print(
+            gray
+            + f"Select coin [1-{len(coins)}]: "
+            + Style.RESET_ALL
+            + white,
+            end="",
+            flush=True,
+        )
         choice = input()
         try:
             idx = int(choice)
@@ -126,7 +144,7 @@ def _get_coin_id(ticker: str) -> str:
                 return coins[idx - 1]["id"]
         except ValueError:
             pass
-        print("Invalid selection. Please try again.")
+        print(gray + "Invalid selection. Please try again." + Style.RESET_ALL)
 
 
 def fetch_coin_info(ticker: str) -> Dict[str, float]:
@@ -144,9 +162,11 @@ def fetch_coin_info(ticker: str) -> Dict[str, float]:
     price = data["market_data"]["current_price"]["usd"]
     supply = data["market_data"].get("circulating_supply")
     if not supply:
-        print("Failed to fetch circulating supply from CoinGecko.")
+        gray = Fore.LIGHTBLACK_EX
+        white = Fore.WHITE
+        print(gray + "Failed to fetch circulating supply from CoinGecko." + Style.RESET_ALL)
         while True:
-            print("Please enter the circulating supply manually: ", end="", flush=True)
+            print(gray + "Please enter the circulating supply manually: " + Style.RESET_ALL + white, end="", flush=True)
             user_input = input()
             try:
                 supply = float(user_input)
@@ -154,7 +174,7 @@ def fetch_coin_info(ticker: str) -> Dict[str, float]:
                     break
             except ValueError:
                 pass
-            print("Invalid input. Enter a positive number.")
+            print(gray + "Invalid input. Enter a positive number." + Style.RESET_ALL)
     return {"price": price, "circulating_supply": supply}
 
 
@@ -211,10 +231,11 @@ def fetch_ohlcv(
     # Display all exchanges reported by CoinGecko so users can verify which
     # markets will be attempted.
     discovered = sorted({ex for ex, _ in markets})
+    gray = Fore.LIGHTBLACK_EX
     if discovered:
-        print("Available exchanges:", ", ".join(discovered))
+        print(gray + "Available exchanges: " + ", ".join(discovered) + Style.RESET_ALL)
     else:
-        print("No exchanges reported on CoinGecko")
+        print(gray + "No exchanges reported on CoinGecko" + Style.RESET_ALL)
 
     supported_markets = [m for m in markets if m[0] in ccxt.exchanges]
     markets_by_exchange: Dict[str, List[str]] = {}

@@ -1,3 +1,4 @@
+import re
 import requests
 import sys
 from pathlib import Path
@@ -43,4 +44,6 @@ def test_fetch_coin_info_prompts_for_supply(monkeypatch, capsys):
     info = crypto_data.fetch_coin_info("foo")
     assert info["circulating_supply"] == 12345.0
     out = capsys.readouterr().out
-    assert "Please enter the circulating supply manually: \n" not in out
+    ansi = re.compile(r"\x1b\[[0-9;]*m")
+    clean = ansi.sub("", out)
+    assert "Please enter the circulating supply manually: \n" not in clean
