@@ -27,6 +27,7 @@ def test_get_coin_id_clears_without_newline(monkeypatch, capsys):
     assert coin_id == "coin-a"
     out = capsys.readouterr().out
     ansi = re.compile(r"\x1b\[[0-9;]*m")
+    assert ansi.search(out)
     clean = ansi.sub("", out)
     assert "Select coin [1-2]: \n" not in clean
     assert clean.endswith("\033[H\033[2J")

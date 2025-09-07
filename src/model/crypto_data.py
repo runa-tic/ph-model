@@ -12,14 +12,9 @@ from typing import Dict, List, Tuple
 
 import ccxt
 import requests
-try:
-    from colorama import Fore, Style
-except ModuleNotFoundError:  # pragma: no cover
-    class _NoColor:
-        def __getattr__(self, name: str) -> str:
-            return ""
+from colorama import Fore, Style, init
 
-    Fore = Style = _NoColor()
+init(autoreset=True)
 
 try:
     from tqdm import tqdm
