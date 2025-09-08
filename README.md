@@ -64,8 +64,9 @@ Paper Hands Model [Version 1.0]
 © Bitmaker L.L.C-FZ. All rights reserved.
 ```
 
-If `colorama` is available, prompts are highlighted to provide a friendlier
-interface, but the CLI also runs without it for standalone builds.
+Prompts are always colorised using
+[`colorama`](https://github.com/tartley/colorama), which ships as a project
+dependency and is bundled into standalone builds.
 
 Example:
 
@@ -103,7 +104,8 @@ bundle it with [PyInstaller](https://pyinstaller.org/):
 
 ```bash
 pip install pyinstaller
-pyinstaller --name crypto-fetch --onefile src/model/cli.py --paths src
+pyinstaller --name crypto-fetch --onefile src/model/cli.py --paths src \
+  --hidden-import colorama
 ```
 
 The compiled binary will be available in the `dist/` directory.

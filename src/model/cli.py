@@ -4,23 +4,11 @@ from __future__ import annotations
 import argparse
 import logging
 import multiprocessing
-import random
 import sys
-import time
 from pathlib import Path
 from typing import List
 
-try:
-    from colorama import Fore, Style, init
-except ModuleNotFoundError:  # pragma: no cover - fallback when colorama isn't bundled
-    class _NoColor:
-        def __getattr__(self, name: str) -> str:
-            return ""
-
-    Fore = Style = _NoColor()
-
-    def init(*_args, **_kwargs):  # type: ignore
-        pass
+from colorama import Fore, Style, init
 
 from model.crypto_data import (
     fetch_coin_info,
@@ -34,47 +22,49 @@ from model.crypto_data import (
 )
 
 
-BASE_ART = """
-            ..........    
-           .----------.   
-         .----------:.==. 
-      ...:---------:-===:. 
-       ..--------.:======.
-       ..------.=========.
-  .  ....:---.-=========:.
-    ..  ..--:==========-. 
-.     ..   .==========.   
-  .      .   .......      
-.    ..  .  . . ...       
-     ..    .              
-            .             
-         . .              
-"""
-
-VARIANTS = ".:=-"
+BASE_ART = [
+    "            ..........",
+    "           .----------.",
+    "         .----------:.==.",
+    "      ...:---------:-===:.",
+    "       ..--------.:======.",
+    "       ..------.=========.",
+    "  .  ....:---.-=========:.",
+    "    ..  ..--:==========-.",
+    ".     ..   .==========.",
+    "  .      .   .......",
+    ".    ..  .  . . ...",
+    "     ..    .",
+    "            .",
+    "         . .",
+]
 
 
-def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
-    lines = BASE_ART.splitlines()
+def print_banner() -> None:
+    """Render the static ASCII logo with coloured half-spheres."""
+    print("\033[H\033[2J", end="")
     footer = [
         "Paper Hands Model [Version 1.0]",
         "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.",
         "",
     ]
-    for _ in range(frames):
-        print("\033[H\033[2J", end="")
-        for line in lines:
-            animated = "".join(
-                random.choice(VARIANTS) if ch != " " else " " for ch in line
-            )
-            print(Fore.CYAN + animated)
-        for line in footer:
-            print(Fore.CYAN + line)
-        sys.stdout.flush()
-        time.sleep(delay)
-    print("\033[H\033[2J", end="")
-    for line in lines:
-        print(Fore.CYAN + line)
+    width = max(len(line) for line in BASE_ART)
+    midpoint = width // 2
+
+    def colour_line(text: str) -> str:
+        coloured = []
+        for col, ch in enumerate(text.ljust(width)):
+            if ch == " ":
+                coloured.append(" ")
+            elif ch == "=":
+                colour = Fore.CYAN if col < midpoint else Fore.LIGHTRED_EX
+                coloured.append(colour + ch)
+            else:
+                coloured.append(Fore.WHITE + ch)
+        return "".join(coloured)
+
+    for line in BASE_ART:
+        print(colour_line(line))
     for line in footer:
         print(Fore.CYAN + line)
     print()
@@ -83,6 +73,7 @@ def animate_banner(frames: int = 20, delay: float = 0.05) -> None:
 def main() -> None:
     multiprocessing.freeze_support()
     init(autoreset=True)
+    print_banner()
 
     GRAY = Fore.LIGHTBLACK_EX
     WHITE = Fore.WHITE
@@ -102,11 +93,6 @@ def main() -> None:
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     if _unknown:
         logging.debug("Ignoring extra args: %s", _unknown)
-
-    console(
-        "Paper Hands Model [Version 1.0]\n"
-        "\u00A9 Bitmaker L.L.C-FZ. All rights reserved.\n"
-    )
 
     ticker = args.ticker or prompt("Enter token ticker: ").strip()
 
