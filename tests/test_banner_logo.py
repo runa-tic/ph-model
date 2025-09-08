@@ -13,6 +13,8 @@ def test_banner_colours_half_spheres_only(capsys):
     out = capsys.readouterr().out
     assert Fore.CYAN + "=" in out
     assert Fore.LIGHTRED_EX + "=" in out
-    assert Fore.WHITE + "." in out
+    assert Fore.CYAN + "-" in out
+    assert Fore.WHITE + "-" not in out
+    assert Fore.LIGHTRED_EX + "-" not in out
     assert Fore.CYAN + "." not in out
     assert Fore.LIGHTRED_EX + "." not in out

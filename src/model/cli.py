@@ -50,8 +50,9 @@ def print_banner() -> None:
     ]
     width = max(len(line) for line in BASE_ART)
     midpoint = width // 2
+    mid_row = len(BASE_ART) // 2
 
-    def colour_line(text: str) -> str:
+    def colour_line(row: int, text: str) -> str:
         coloured = []
         for col, ch in enumerate(text.ljust(width)):
             if ch == " ":
@@ -59,12 +60,14 @@ def print_banner() -> None:
             elif ch == "=":
                 colour = Fore.CYAN if col < midpoint else Fore.LIGHTRED_EX
                 coloured.append(colour + ch)
+            elif ch == "-" and row <= mid_row:
+                coloured.append(Fore.CYAN + ch)
             else:
                 coloured.append(Fore.WHITE + ch)
         return "".join(coloured)
 
-    for line in BASE_ART:
-        print(colour_line(line))
+    for row, line in enumerate(BASE_ART):
+        print(colour_line(row, line))
     for line in footer:
         print(Fore.CYAN + line)
     print()
